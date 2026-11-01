@@ -1,0 +1,9 @@
+# TD-29: only npm is supported; prevent second lockfiles from returning.
+pnpm-lock.yaml
+yarn.lock
+package-lock.json.bak
+
+node_modules/
+dist/
+.DS_Store
+*.local
