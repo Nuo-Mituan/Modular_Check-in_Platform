@@ -150,7 +150,7 @@
       </div>
 
       <footer class="form-footer">
-        <span>签到云台 · Daily Check-in Platform</span>
+        <span>签到云台 · Modular Check-in Platform</span>
         <span class="footer-dot"></span>
         <span>v{{ version }}</span>
       </footer>

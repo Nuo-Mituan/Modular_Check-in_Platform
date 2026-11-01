@@ -1,7 +1,7 @@
 {
   "name": "Acme 签到（进阶多账号模板）",
   "description": "生产级多账号模块骨架：平台负责账号串行、随机时间与统一推送；单个 run(params) 专注 Cookie 过期检测、自动重新登录、指数退避重试和超时控制。默认模拟模式，无网络也能安全试跑。",
-  "author": "Daily Check-in Platform",
+  "author": "Modular Check-in Platform",
   "version": "2.0.0",
   "icon": "🛰️",
   "default_start_time": "09:00",

@@ -1,7 +1,7 @@
 {
   "name": "演示签到",
   "description": "单账号示例模块：读取账号、密码、区服等参数，模拟完成每日签到并输出过程日志；支持随机执行时间与模拟失败。不会访问任何真实接口。",
-  "author": "Daily Check-in Platform",
+  "author": "Modular Check-in Platform",
   "directory_name": "demo_checkin",
   "version": "1.1.0",
   "icon": "💡",

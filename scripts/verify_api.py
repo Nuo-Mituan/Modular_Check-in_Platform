@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""End-to-end API verification for the Daily Check-in Platform.
+"""End-to-end API verification for the Modular Check-in Platform.
 
 The HTTP checks use the standard library. The legacy-cycle migration check
 imports the application modules to run the real migration function:

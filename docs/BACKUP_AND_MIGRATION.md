@@ -32,7 +32,7 @@
 推荐**先停止服务**，再做文件级备份，避免 SQLite 处于写入中间状态。
 
 ```bash
-cd /path/to/daily-checkin-platform
+cd /path/to/modular-checkin-platform
 
 # 确保备份目录存在，并限制权限
 mkdir -p backups
@@ -117,10 +117,10 @@ scp "$ARCHIVE.gpg" backup-host:/secure/checkin/
 
 ```bash
 # 安装 Docker Engine + Compose v2
-git clone <你的仓库地址> /opt/daily-checkin-platform
+git clone <你的仓库地址> /opt/modular-checkin-platform
 # 或者拷贝与备份时相同版本的项目源码
 
-cd /opt/daily-checkin-platform
+cd /opt/modular-checkin-platform
 mkdir -p data modules logs
 ```
 
@@ -211,7 +211,7 @@ docker compose logs --tail=100 checkin-platform
 ### 4.2 标准升级流程
 
 ```bash
-cd /path/to/daily-checkin-platform
+cd /path/to/modular-checkin-platform
 
 # 1. 备份
 docker compose stop
@@ -277,7 +277,7 @@ docker compose logs --tail=100 checkin-platform
 ### 4.5 回滚
 
 ```bash
-cd /path/to/daily-checkin-platform
+cd /path/to/modular-checkin-platform
 
 docker compose down
 
