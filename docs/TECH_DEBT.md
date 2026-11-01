@@ -16,7 +16,7 @@
 > **Batch 3 状态（2026-10-20）**：TD-06 / TD-13 / TD-14 / TD-16 / TD-20 已完成。
 > 环形日志改为单写线程 + 有界队列；SSE 指标/重连滞后可查询；心跳可配置；新增只读系统日志页。
 
-### 已完成（23）
+### 已完成（24）
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -43,12 +43,12 @@
 | ✅ | TD-16 | P3 | `routers/logs.py` | SSE keep-alive 固定 15 秒 | 不适合特殊代理 | 配置化 | 日志维护者 |
 | ✅ | TD-17 | P3 | `services/module_upload.py` | 临时文件 close 异常被静默忽略 | 极端文件句柄问题无日志 | 记录 debug 日志 | 模块维护者 |
 
-### 待清零（6）
+### 待清零（5）
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | ⬜ | TD-23 | P1 | `Releases/` / CI | 发布清单与版本更新判定缺失；无 manifest/latest/上传脚本。**覆盖上传 ≠ 客户端版本更新判定**，当前无任何更新判定机制 | 客户端无法判断新版本，发布流程依赖人工 | 设计最小版本清单、checksum、CI 覆盖上传与更新检查 | 发布负责人 |
-| ⬜ | TD-24 | P2 | `frontend/src/components/ModuleIcon.vue` | 无组件级挂载测试；当前仅共享函数 + 源码 wiring 测试 | 组件回归可能漏测 | 引入 Vue Test Utils，覆盖 415/413/code/detail/fallback | 前端维护者 |
+| ✅ | TD-24 | P2 | `frontend/src/components/ModuleIcon.vue` | 无组件级挂载测试；当前仅共享函数 + 源码 wiring 测试 | 组件回归可能漏测 | 引入 Vue Test Utils，覆盖 415/413/code/detail/fallback | 前端维护者 |
 | ✅ | TD-25 | P2 | `pyproject.toml` / Docker / 包名 | 项目标识 B 类改名未执行（package/image/import/CI 工件） | 与旧名共存，影响长期品牌与依赖引用 | 1.0.7 设计迁移与别名兼容；Alembic/表名不改 | 平台维护者 |
 | ⬜ | TD-18 | P3 | 全项目 | 未接入 import-linter / mypy / ruff CI | 回归依赖人工 | CI 增加 import-linter、mypy（渐进）、ruff | 平台维护者 |
 | ⬜ | TD-19 | P3 | `services/execution.py` | 旧 `execution_logs.output` 字段保留 | 数据模型有历史包袱 | 下个大版本迁移后移除 | 平台维护者 |
@@ -67,7 +67,7 @@
 
 ### v1.0.7 技术债核对结论（2026-11-01）
 
-- 已完成：**23 项**；待清零：**6 项**；已关闭：**2 项**（总数 31）。
+- 已完成：**24 项**；待清零：**5 项**；已关闭：**2 项**（总数 31）。
 - 差异说明：`TECH_DEBT_CLEARANCE_PLAN.md` 记录 RC6-TD-01~20 已全部清零，但本次核对确认
   TD-18（CI 缺 import-linter）与 TD-19（`backend/app/models.py` 仍保留废弃的
   `execution_logs.output` 字段）不标为已完成。
@@ -181,8 +181,8 @@ v1.0.7 第一周必须完成以下评估并给出排期：
 ## 自检数据
 
 ```text
-已完成标记数：23
-待清零标记数：6
+已完成标记数：24
+待清零标记数：5
 修改文件：docs/TECH_DEBT.md
 未修改：任何源码、测试、Releases/v1.0.6/
 ```
