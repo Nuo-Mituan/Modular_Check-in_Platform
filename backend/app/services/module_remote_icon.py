@@ -37,8 +37,6 @@ REMOTE_ICON_ERROR: Final = "远程图标不可用"
 REMOTE_ICON_FORMAT_ERROR: Final = "远程图标格式不支持"
 CONTENT_TYPE_ALIASES = {"image/jpg": "image/jpeg"}
 ALLOWED_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
-POSITIVE_TTL = 86400.0
-NEGATIVE_TTL = 30.0
 CACHE_MAX = 64
 NEGATIVE_MAX = 256
 
@@ -118,7 +116,8 @@ async def _fetch(url: str) -> tuple[bytes, str, str]:
     async with httpx.AsyncClient(follow_redirects=False, timeout=timeout, trust_env=False,
                                  headers={"Accept": "image/*", "User-Agent": "ModularCheckin/1.0"}) as client:
         current = url
-        for attempt in range(4):
+        redirects = 0
+        while True:
             try:
                 async with client.stream("GET", current) as response:
                     if response.status_code in {301, 302, 303, 307, 308}:
@@ -130,6 +129,9 @@ async def _fetch(url: str) -> tuple[bytes, str, str]:
                         if nxt.username is not None or nxt.password is not None:
                             raise RemoteIconError()
                         if urlsplit(current).scheme == "https" and nxt.scheme != "https":
+                            raise RemoteIconError()
+                        redirects += 1
+                        if redirects > 3:
                             raise RemoteIconError()
                         await _validate_target(next_url)
                         current = next_url
@@ -155,14 +157,16 @@ async def _fetch(url: str) -> tuple[bytes, str, str]:
             except (httpx.HTTPError, OSError, asyncio.TimeoutError) as exc:
                 logger.warning("远程图标拉取失败 module_url=%s error=%s", _safe_url(current), type(exc).__name__)
                 raise RemoteIconError() from exc
-            if attempt >= 3:
-                raise RemoteIconError()
     raise RemoteIconError()
 
 
 _CACHE: OrderedDict[tuple[int, str], tuple[bytes, str, str, float]] = OrderedDict()
 _NEGATIVE: dict[tuple[int, str], float] = {}
 _INFLIGHT: dict[tuple[int, str], asyncio.Task[tuple[bytes, str, str]]] = {}
+
+
+def _cache_key(module_id: int, url: str) -> tuple[int, str]:
+    return (module_id, url)
 
 
 def _purge_negative(now: float) -> None:
@@ -174,7 +178,7 @@ def _purge_negative(now: float) -> None:
 
 
 async def get_remote_icon(module_id: int, url: str) -> tuple[bytes, str, str]:
-    key = (module_id, url)
+    key = _cache_key(module_id, url)
     now = time.monotonic()
     _purge_negative(now)
     cached = _CACHE.get(key)
@@ -190,11 +194,11 @@ async def get_remote_icon(module_id: int, url: str) -> tuple[bytes, str, str]:
     try:
         data, content_type, digest = await task
     except Exception:
-        _NEGATIVE[key] = time.monotonic() + NEGATIVE_TTL
+        _NEGATIVE[key] = time.monotonic() + settings.remote_icon_negative_ttl_seconds
         raise
     finally:
         _INFLIGHT.pop(key, None)
-    _CACHE[key] = (data, content_type, digest, time.monotonic() + POSITIVE_TTL)
+    _CACHE[key] = (data, content_type, digest, time.monotonic() + settings.remote_icon_cache_ttl_seconds)
     _CACHE.move_to_end(key)
     while len(_CACHE) > CACHE_MAX:
         _CACHE.popitem(last=False)

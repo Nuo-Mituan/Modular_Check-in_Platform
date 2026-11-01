@@ -77,6 +77,8 @@ class Settings(BaseSettings):
     remote_icon_max_bytes: int = 256 * 1024
     remote_icon_timeout_seconds: float = 5.0
     remote_icon_connect_timeout_seconds: float = 3.0
+    remote_icon_cache_ttl_seconds: float = 86400.0
+    remote_icon_negative_ttl_seconds: float = 30.0
 
     # --------------------------------------------------------------- push
     push_skip_notice: bool = True

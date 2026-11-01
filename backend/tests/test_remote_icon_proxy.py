@@ -117,3 +117,58 @@ async def test_https_resolved_rfc1918_allowed(monkeypatch: pytest.MonkeyPatch) -
         return [ipaddress.ip_address("10.0.0.1")]
     monkeypatch.setattr(icon, "_resolve", resolved)
     await icon._validate_target("https://internal.example/icon.png")
+
+
+@pytest.mark.asyncio
+async def test_negative_cache_includes_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    async def fail(url: str) -> tuple[bytes, str, str]:
+        calls.append(url)
+        raise RemoteIconError()
+    monkeypatch.setattr(icon, "_fetch", fail)
+    icon._CACHE.clear(); icon._NEGATIVE.clear(); icon._INFLIGHT.clear()
+    for url in ("https://dead/a.png", "https://dead/b.png"):
+        with pytest.raises(RemoteIconError):
+            await get_remote_icon(4, url)
+    assert calls == ["https://dead/a.png", "https://dead/b.png"]
+
+
+@pytest.mark.asyncio
+async def test_inflight_key_includes_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    gate = asyncio.Event()
+    async def slow(url: str) -> tuple[bytes, str, str]:
+        calls.append(url)
+        await gate.wait()
+        return b"png", "image/png", url
+    monkeypatch.setattr(icon, "_fetch", slow)
+    icon._CACHE.clear(); icon._NEGATIVE.clear(); icon._INFLIGHT.clear()
+    first = asyncio.create_task(get_remote_icon(5, "https://same/a.png"))
+    second = asyncio.create_task(get_remote_icon(5, "https://same/b.png"))
+    await asyncio.sleep(0); gate.set()
+    await asyncio.gather(first, second)
+    assert calls == ["https://same/a.png", "https://same/b.png"]
+
+
+@pytest.mark.asyncio
+async def test_redirect_limit_is_explicit_502(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        def __init__(self) -> None:
+            self.status_code = 302
+            self.headers = {"location": "/next.png"}
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return False
+        async def aiter_bytes(self):
+            if False:
+                yield b""
+    class Client:
+        def __init__(self, *args, **kwargs) -> None: pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return False
+        def stream(self, *args, **kwargs): return Response()
+    async def ok(_: str) -> None: return None
+    monkeypatch.setattr(icon, "_validate_target", ok)
+    monkeypatch.setattr(icon.httpx, "AsyncClient", Client)
+    with pytest.raises(RemoteIconError) as exc:
+        await icon._fetch("https://example.com/start.png")
+    assert exc.value.status_code == 502
