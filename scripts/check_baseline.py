@@ -97,6 +97,7 @@ def check_openapi(bl: dict, *, regenerate: bool = False) -> None:
     if base.get("info", {}).get("version") != bl["version"]:
         die(f"OpenAPI baseline info.version={base.get('info',{}).get('version')} != {bl['version']}")
     br = []
+    nbr = []
     bp, cp = base.get("paths", {}), cur.get("paths", {})
     for path, methods in bp.items():
         if path not in cp:
@@ -105,11 +106,18 @@ def check_openapi(bl: dict, *, regenerate: bool = False) -> None:
         for method in methods:
             if method not in cp[path]:
                 br.append(f"method_removed:{method.upper()} {path}")
+    for path, methods in cp.items():
+        if path not in bp:
+            nbr.append(f"new_path:{path}")
+            continue
+        for method in methods:
+            if method not in bp[path]:
+                nbr.append(f"new_method:{method.upper()} {path}")
     allow = set(bl.get("openapi_breaking_allow", []))
     hard = [x for x in br if x not in allow]
     if hard:
         die(f"OpenAPI breaking: {hard}")
-    print(f"ok: OpenAPI breaking=0, paths={len(cp)}")
+    print(f"ok: OpenAPI breaking=0, non-breaking={len(nbr)}, paths={len(cp)}")
 
 
 def check_versions(bl: dict) -> None:

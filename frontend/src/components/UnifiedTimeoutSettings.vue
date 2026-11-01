@@ -13,7 +13,7 @@
         :loading="saving"
         active-text="开启兜底"
         inactive-text="不兜底"
-        @change="save"
+        @change="saveEnabled"
       />
     </div>
     <div class="panel-body timeout-body">
@@ -25,7 +25,7 @@
           value-format="HH:mm"
           :clearable="false"
           placeholder="23:30"
-          @change="save"
+          @change="saveTime"
         />
       </template>
       <p class="timeout-note">
@@ -54,11 +54,16 @@ const timeModel = computed({
   set: (value) => emit('update:time', value || '23:30'),
 })
 
-function save() {
-  emit('save', {
-    enabled: enabledModel.value,
-    time: timeModel.value,
-  })
+function saveEnabled(value) {
+  const enabled = Boolean(value)
+  emit('update:enabled', enabled)
+  emit('save', { enabled, time: timeModel.value })
+}
+
+function saveTime(value) {
+  const time = value || '23:30'
+  emit('update:time', time)
+  emit('save', { enabled: enabledModel.value, time })
 }
 </script>
 

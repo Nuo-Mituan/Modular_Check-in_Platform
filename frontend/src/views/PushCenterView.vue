@@ -251,13 +251,20 @@ async function loadTimeoutSettings() {
 
 async function saveTimeoutSettings(payload = {}) {
   savingTimeout.value = true
+  const requestedEnabled = Boolean(payload.enabled ?? timeoutEnabled.value)
+  const requestedTime = payload.time || timeoutTime.value || '23:30'
   try {
     const data = await pushApi.updateUnifiedSettings({
-      timeout_enabled: Boolean(payload.enabled ?? timeoutEnabled.value),
-      timeout_time: payload.time || timeoutTime.value || '23:30',
+      timeout_enabled: requestedEnabled,
+      timeout_time: requestedTime,
     })
     timeoutEnabled.value = Boolean(data.timeout_enabled)
     timeoutTime.value = data.timeout_time
+    if (Boolean(data.timeout_enabled) !== requestedEnabled) {
+      ElMessage.error('超时推送设置未生效，请检查前置条件')
+      await loadTimeoutSettings().catch(() => {})
+      return
+    }
     ElMessage.success('超时推送设置已保存')
   } catch {
     await loadTimeoutSettings().catch(() => {})

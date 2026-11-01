@@ -15,7 +15,7 @@
     "backend/app/services/push_delivery.py",
     "backend/app/services/bootstrap.py"
   ],
-  "frontend_tests_min": 29,
+  "frontend_tests_min": 31,
   "openapi_breaking_allow": [],
   "lockfile_manager": "npm",
   "forbidden_lockfiles": [
