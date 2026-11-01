@@ -33,6 +33,7 @@ from ..crypto import EncryptionContext, ParameterDecryptionError, parameter_ciph
 from ..database import SessionLocal, get_db
 from ..deps import AuthContext, get_auth_context, get_current_user
 from ..models import ExecutionLog, Module, ModuleSchedule, PushPool, User
+from ..services.remote_url import RemoteUrlError, normalize_remote_url
 from ..services.module_icon import (
     ModuleIconError,
     load_icon,
@@ -927,6 +928,11 @@ async def update_module(
 ) -> ModuleDetail:
     module = await _get_module_or_404(db, module_id)
     config = _live_config(module)
+    if isinstance(config.icon, str) and config.icon.startswith(("http://", "https://")):
+        try:
+            normalize_remote_url(config.icon, field_label="模块图标")
+        except RemoteUrlError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     context = EncryptionContext(
         user_id=await owner_user_id(db), module_key=module.key, account_index=-1
     )

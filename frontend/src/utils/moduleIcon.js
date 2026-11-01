@@ -6,20 +6,40 @@ import { isSupportedIconExtension } from '../constants/moduleIcon.js'
 export const DATA_URI_RE = /^data:image\/(x-icon|png);base64,[A-Za-z0-9+/=]+$/
 const UNSAFE_PATH_RE = /(^|[\\/])\.\.([\\/]|$)|\\|\0/
 
+// Mirror of REMOTE_HTTP_ERROR in backend/app/services/remote_url.py (TD-31 unification).
 export const REMOTE_HTTP_ERROR = '远程地址使用 http:// 时仅允许本地或内网地址，公网请使用 https://'
+
+function rawAuthority(value) {
+  const match = String(value).match(/^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i)
+  return match ? match[1] : ''
+}
+
+function hasIncompleteIpLiteral(value) {
+  const authority = rawAuthority(value)
+  if (authority.includes('@')) return true
+  let host = authority.replace(/^.*@/, '')
+  if (host.startsWith('[')) return false
+  host = host.replace(/:\d+$/, '')
+  if (!/^\d[\d.]*$/.test(host)) return false
+  const parts = host.split('.')
+  return !(parts.length === 4 && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255))
+}
 
 // Frontend guard only; backend remains the security boundary.
 export function isInsecureHostAllowed(hostname) {
   const host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '')
-  if (host === 'localhost') return true
-  if (host === '::1') return true
+  if (host === 'localhost' || host === '::1') return true
+  if (host.endsWith('.')) return false
   if (host.startsWith('::ffff:')) return false
   if (host.startsWith('fe80:') || host === '::') return false
-  if (/^(fc|fd)[0-9a-f:]*$/.test(host)) return true
-  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true
-  const match = host.match(/^172\.(\d+)\./)
-  if (match && Number(match[1]) >= 16 && Number(match[1]) <= 31) return true
-  return false
+  if (/^(fc|fd)[0-9a-f:]+$/.test(host)) return true
+  const parts = host.split('.')
+  if (parts.length !== 4) return false
+  if (!parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)) return false
+  if (Number(parts[0]) === 127) return true
+  if (Number(parts[0]) === 10) return true
+  if (Number(parts[0]) === 192 && Number(parts[1]) === 168) return true
+  return Number(parts[0]) === 172 && Number(parts[1]) >= 16 && Number(parts[1]) <= 31
 }
 
 export function classifyModuleIcon({ icon = '', source = 'url', iconData = '', moduleKey = '' } = {}) {
@@ -39,7 +59,7 @@ export function classifyModuleIcon({ icon = '', source = 'url', iconData = '', m
   if (/^https?:\/\//i.test(value)) {
     try {
       const parsed = new URL(value)
-      if (parsed.protocol === 'http:' && !isInsecureHostAllowed(parsed.hostname)) {
+      if (parsed.protocol === 'http:' && (hasIncompleteIpLiteral(value) || !isInsecureHostAllowed(parsed.hostname))) {
         return { type: 'fallback', src: '', reason: REMOTE_HTTP_ERROR }
       }
       // Dotted last segments (e.g. /assets/1.2) are conservatively treated as

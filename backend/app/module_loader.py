@@ -220,7 +220,7 @@ class ModuleConfig(BaseModel):
                 self.legacy_key
             ):
                 raise ValueError("legacy_key 只能包含字母、数字、下划线和短横线")
-        if self.icon.startswith(("http://", "https://")):
+        if isinstance(self.icon, str) and self.icon.startswith(("http://", "https://")):
             try:
                 normalize_remote_url(self.icon, field_label="模块图标")
             except RemoteUrlError as exc:

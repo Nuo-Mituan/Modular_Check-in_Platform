@@ -2,6 +2,8 @@
 
 Only literal hosts are classified.  Hostnames are not resolved: this avoids
 DNS/async coupling and prevents a public hostname from being treated as local.
+TD-32 (tracked separately): custom push-driver URLs are not covered here because
+the driver, not this backend, performs those HTTP requests.
 """
 from __future__ import annotations
 
@@ -68,6 +70,8 @@ def normalize_remote_url(value: str, *, field_label: str = "远程地址") -> st
     host = parsed.hostname
     if not host:
         raise RemoteUrlError(f"{field_label} URL 缺少主机名")
+    if parsed.username is not None or parsed.password is not None:
+        raise RemoteUrlError(f"{field_label} URL 不能包含用户名或密码")
     if parsed.scheme.lower() == "http" and not is_insecure_host_allowed(host):
         raise RemoteUrlError(REMOTE_HTTP_ERROR)
     return text
