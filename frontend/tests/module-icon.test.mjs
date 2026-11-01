@@ -81,3 +81,29 @@ test('remote SVG URLs fall back and supported extensions remain remote', () => {
     'remote-url',
   )
 })
+
+test('http remote URL allows only literal local/private hosts', () => {
+  for (const icon of [
+    'http://localhost:8080/icon.png',
+    'http://127.0.0.1/icon.png',
+    'http://10.1.2.3/icon.png',
+    'http://172.16.0.1/icon.png',
+    'http://192.168.1.1/icon.png',
+    'http://[::1]/icon.png',
+    'http://[fd00::1]/icon.png',
+    'http://evil.com@127.0.0.1/icon.png',
+    'http://127.0.0.1#@evil.com/icon.png',
+  ]) assert.equal(classifyModuleIcon({ icon }).type, 'remote-url', icon)
+  for (const icon of [
+    'http://example.com/icon.png',
+    'http://169.254.1.1/icon.png',
+    'http://[::ffff:10.0.0.1]/icon.png',
+    'http://0.0.0.0/icon.png',
+    'http://[::]/icon.png',
+    'http://localhost./icon.png',
+  ]) assert.equal(classifyModuleIcon({ icon }).type, 'fallback', icon)
+  assert.equal(
+    classifyModuleIcon({ icon: 'http://example.com/icon.png' }).reason,
+    '远程地址使用 http:// 时仅允许本地或内网地址，公网请使用 https://',
+  )
+})

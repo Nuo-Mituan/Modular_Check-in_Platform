@@ -73,6 +73,7 @@ class Settings(BaseSettings):
     sse_keepalive_seconds: int = 15
     sse_queue_max: int = 2_000
     upload_max_mb: int = 10
+    remote_http_allow_hosts: str = "localhost,127.0.0.1"
 
     # --------------------------------------------------------------- push
     push_skip_notice: bool = True

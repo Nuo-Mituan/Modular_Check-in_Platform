@@ -109,7 +109,7 @@ watch(
       moduleKey: props.moduleKey,
     })
     failed.value = kind.type === 'fallback'
-    failureReason.value = kind.type === 'fallback' ? 'no-source' : ''
+    failureReason.value = kind.type === 'fallback' ? (kind.reason || 'no-source') : ''
     if (kind.type === 'emoji' || kind.type === 'fallback') {
       imageSrc.value = ''
       if (kind.type === 'fallback') {

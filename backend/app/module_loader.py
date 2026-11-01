@@ -34,6 +34,7 @@ from sqlalchemy import event as sa_event, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import settings
+from .services.remote_url import RemoteUrlError, normalize_remote_url
 from .models import Module
 from .scheduling import (
     LEGACY_CYCLE_MAP,
@@ -219,6 +220,12 @@ class ModuleConfig(BaseModel):
                 self.legacy_key
             ):
                 raise ValueError("legacy_key 只能包含字母、数字、下划线和短横线")
+        if self.icon.startswith(("http://", "https://")):
+            try:
+                normalize_remote_url(self.icon, field_label="模块图标")
+            except RemoteUrlError as exc:
+                # Existing modules must still load; new uploads are rejected explicitly.
+                logger.warning("模块图标远程地址不合规：%s", exc)
         if self.icon.startswith("data:"):
             data_uri = self.icon
         if data_uri is not None:

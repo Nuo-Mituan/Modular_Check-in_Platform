@@ -25,6 +25,7 @@ def _close_quietly(handle: object) -> None:
         handle.close()  # type: ignore[attr-defined]
     except Exception:
         logger.debug("关闭模块上传临时文件失败", exc_info=True)
+from ..services.remote_url import RemoteUrlError, normalize_remote_url
 from ..module_loader import (
     MODULE_KEY_PATTERN,
     ModuleConfig,
@@ -197,6 +198,11 @@ def _install_zip_sync(
         if not (temp_root / "main.py").is_file():
             raise ModuleUploadError("解压后未找到 main.py")
         config = parse_config_file(temp_root / "config.json")
+        if config.icon.startswith(("http://", "https://")):
+            try:
+                normalize_remote_url(config.icon, field_label="模块图标")
+            except RemoteUrlError as exc:
+                raise ModuleUploadError(str(exc)) from exc
 
         if target.exists():
             backup = modules_dir / f".backup-{physical_directory}-{secrets.token_hex(4)}"
