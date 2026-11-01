@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import subprocess
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -55,6 +56,18 @@ meta_router = APIRouter(
 )
 
 
+def _git_commit() -> str:
+    configured = os.environ.get("GIT_COMMIT", "").strip()
+    if configured:
+        return configured
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], text=True, timeout=2
+        ).strip() or "unknown"
+    except Exception:
+        return "unknown"
+
+
 @health_router.get("/version", response_model=VersionInfoOut, summary="版本与更新判定信息")
 async def version_info(request: Request, response: Response) -> VersionInfoOut:
     now = datetime.now(timezone.utc).isoformat()
@@ -67,7 +80,7 @@ async def version_info(request: Request, response: Response) -> VersionInfoOut:
     return VersionInfoOut(
         version=settings.app_version,
         build_time=os.environ.get("BUILD_TIME", now),
-        git_commit=os.environ.get("GIT_COMMIT", "unknown"),
+        git_commit=_git_commit(),
         min_supported_client=os.environ.get("MIN_SUPPORTED_CLIENT", "1.0.0"),
         recommended=True,
         release_notes_url=f"/Releases/v{settings.app_version}/RELEASE_NOTES.md",

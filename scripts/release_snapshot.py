@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -69,6 +70,14 @@ def main() -> int:
     parser.add_argument("--allow-stale-dist", action="store_true")
     parser.add_argument("--checklist-json", type=Path, default=None)
     args = parser.parse_args()
+    git_commit = os.environ.get("GIT_COMMIT", "").strip()
+    if not git_commit:
+        try:
+            git_commit = subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"], text=True, timeout=2
+            ).strip()
+        except Exception:
+            git_commit = "unknown"
     root = args.root.resolve()
     target = root / "Releases" / f"v{args.version}"
     if target.parent == target or target == root:
@@ -159,6 +168,9 @@ def main() -> int:
         notes.write_text("# Release notes\n", encoding="utf-8")
 
     included = sorted(set(files) | set(dist_files) | {Path("RELEASE_NOTES.md")})
+    checklist_path = target / "checklist.json"
+    if checklist_path.is_file():
+        included.append(Path("checklist.json"))
     generated_at = os.environ.get(
         "RELEASE_TIMESTAMP",
         datetime.now(timezone.utc).isoformat(),
@@ -173,7 +185,7 @@ def main() -> int:
         "copied_file_count": len(files),
         "dist_file_count": len(dist_files),
         "dist_included": bool(dist_files),
-        "git_commit": os.environ.get("GIT_COMMIT", "unknown"),
+        "git_commit": git_commit,
         "payload_checksum": None,
         "checklist": checklist,
         "stale_dist_allowed": bool(args.allow_stale_dist),

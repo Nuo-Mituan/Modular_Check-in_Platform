@@ -195,6 +195,26 @@ def check_tech_debt() -> None:
         print(f"ok: TECH_DEBT 计数 {nums}")
 
 
+
+def check_release_payload_contract() -> None:
+    """TD-23b: validate generated manifest provenance when a payload exists."""
+    manifest = Path("Releases") / "v1.0.7" / "MANIFEST.json"
+    if not manifest.is_file():
+        return
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    if not data.get("payload_checksum"):
+        die("TD-23b: manifest.payload_checksum is missing")
+    checklist = data.get("checklist") or {}
+    if checklist.get("status") != "pass":
+        die("TD-23b: manifest.checklist.status != pass")
+    checks = checklist.get("checks") or []
+    if len(checks) < 6 or not all(c.get("name") for c in checks):
+        die("TD-23b: manifest checklist is incomplete")
+    if data.get("git_commit") in (None, "", "unknown"):
+        die("TD-23b: manifest.git_commit is missing")
+    print(f"ok: release manifest checksum/checklist/git_commit ({data['git_commit']})")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--baseline", default="scripts/release_baseline.json")
@@ -211,6 +231,7 @@ def main() -> int:
     check_versions(bl)
     check_lockfile(bl)
     check_tech_debt()
+    check_release_payload_contract()
     print("check_baseline: ALL PASS")
     return 0
 

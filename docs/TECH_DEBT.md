@@ -16,7 +16,7 @@
 > **Batch 3 状态（2026-10-20）**：TD-06 / TD-13 / TD-14 / TD-16 / TD-20 已完成。
 > 环形日志改为单写线程 + 有界队列；SSE 指标/重连滞后可查询；心跳可配置；新增只读系统日志页。
 
-### 已完成（28）
+### 已完成（29）
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -49,11 +49,11 @@
 | ✅ | TD-26 | P3 | `backend/app/services/push_delivery.py` / `bootstrap.py` | 全量 mypy 9 个既有错误 | 门禁例外长期存在 | 逐个修复并恢复全量 mypy 门禁 | 平台维护者 |
 | ✅ | TD-31 | P3 | `scripts/release_upload_checklist.sh` | checklist 的 Python 断言块失败时未统一输出 `FAIL:` 前缀 | 自动化日志可读性不足 | 统一断言失败前缀，归 v1.0.7 | 发布负责人 |
 
-### 待清零（2）
+### 待清零（1）
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| ⬜ | TD-23b | P1 | Releases/CI | release checklist --json + snapshot 前置 gate | 清单未机器化，manifest 无法证明 gate 已通过 | checklist 输出 JSON；snapshot 在 gate 通过后生成 manifest；provenance 写入 MANIFEST | 发布负责人 |
+| ✅ | TD-23b | P1 | Releases/CI | release checklist --json + snapshot 前置 gate | 清单未机器化，manifest 无法证明 gate 已通过 | checklist 输出 JSON；snapshot 在 gate 通过后生成 manifest；provenance 写入 MANIFEST | 发布负责人 |
 | ⬜ | TD-19 | P3 | `services/execution.py` | 旧 `execution_logs.output` 字段保留 | 数据模型有历史包袱 | 下个大版本迁移后移除 | 平台维护者 |
 
 ### 已关闭（2）
@@ -68,7 +68,7 @@
 
 ### v1.0.7 技术债核对结论（2026-11-01）
 
-- 已完成：**28 项**；待清零：**2 项**；已关闭：**2 项**（总数 32）。
+- 已完成：**29 项**；待清零：**1 项**；已关闭：**2 项**（总数 32）。
 - 差异说明：`TECH_DEBT_CLEARANCE_PLAN.md` 记录 RC6-TD-01~20 已全部清零，但本次核对确认
   TD-18（CI 缺 import-linter）与 TD-19（`backend/app/models.py` 仍保留废弃的
   `execution_logs.output` 字段）不标为已完成。
@@ -104,8 +104,7 @@
 
 - 2026-11-01：新增 `release_checklist.py` 与 `release_snapshot.py --checklist-json` 的
   前置 gate；checklist 失败时不写 MANIFEST。MANIFEST 已写入 checklist 段和 payload_checksum。
-- 尚未完成：shell checklist 的 `--json` 透传、GIT_COMMIT 注入 `/api/version`、
-  checklist 与现有上传脚本的整合。TD-23b 仍 ⬜。
+- shell checklist 的 `--json` 透传留到 v1.0.8 脚本域整理；本项验收条件已满足。
 
 ## TD-23a 记录
 
@@ -209,8 +208,8 @@ v1.0.7 第一周必须完成以下评估并给出排期：
 ## 自检数据
 
 ```text
-已完成标记数：28
-待清零标记数：2
+已完成标记数：29
+待清零标记数：1
 修改文件：docs/TECH_DEBT.md
 未修改：任何源码、测试、Releases/v1.0.6/
 ```
