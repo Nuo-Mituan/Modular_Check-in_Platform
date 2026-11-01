@@ -35,7 +35,7 @@ test('blocks traversal and absolute secret paths', () => {
 
 test('legacy base64 source and local fallback stay compatible', () => {
   assert.equal(
-    classifyModuleIcon({ icon: 'ignored', source: 'base64', iconData: 'data:image/png;base64,AAAA', moduleKey: key }).type,
+    classifyModuleIcon({ icon: 'ignored', source: 'base64', iconData: 'data:image/png;base64,iVBORw0KGgo=', moduleKey: key }).type,
     'base64',
   )
   assert.equal(classifyModuleIcon({ icon: '🎯', source: 'local', moduleKey: key }).type, 'local-path')
@@ -57,7 +57,7 @@ test('builds module icon URL without depending on API object methods', () => {
 
 test('unsupported local extensions fall back without a network request', () => {
   assert.equal(
-    classifyModuleIcon({ icon: './favicon.gif', moduleKey: key }).type,
+    classifyModuleIcon({ icon: './favicon.bmp', moduleKey: key }).type,
     'fallback',
   )
 })
@@ -109,5 +109,13 @@ test('http remote URL allows only literal local/private hosts', () => {
   assert.equal(
     classifyModuleIcon({ icon: 'http://example.com/icon.png' }).reason,
     '远程地址使用 http:// 时仅允许本地或内网地址，公网请使用 https://',
+  )
+})
+
+test('gif is allowed and data URI magic mismatch is rejected', () => {
+  assert.equal(classifyModuleIcon({ icon: './favicon.gif', moduleKey: key }).type, 'local-path')
+  assert.equal(
+    classifyModuleIcon({ icon: 'data:image/png;base64,/9j/4AAQ', moduleKey: key }).type,
+    'fallback',
   )
 })

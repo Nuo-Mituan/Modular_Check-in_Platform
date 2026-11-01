@@ -1,9 +1,24 @@
 // Icon type resolution is intentionally pure so it can be unit-tested without
 // mounting Vue. Priority: legacy base64 fields, data URI, HTTPS, local file,
 // then Emoji/text. Anything path-like but unsafe is a hard fallback to ⚠️.
-import { isSupportedIconExtension } from '../constants/moduleIcon.js'
+import { ICON_UNSUPPORTED_DETAIL, isSupportedIconExtension } from '../constants/moduleIcon.js'
 
-export const DATA_URI_RE = /^data:image\/(x-icon|png);base64,[A-Za-z0-9+/=]+$/
+export const DATA_URI_RE = /^data:image\/(x-icon|png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/
+function dataUriMagicOk(value) {
+  try {
+    const [head, body] = String(value).split(',', 2)
+    const mime = head.slice(5).split(';')[0].toLowerCase()
+    const raw = atob(body)
+    const b = Uint8Array.from(raw, (c) => c.charCodeAt(0))
+    const png = b[0]===0x89&&b[1]===0x50&&b[2]===0x4e&&b[3]===0x47
+    const jpg = b[0]===0xff&&b[1]===0xd8&&b[2]===0xff
+    const gif = b[0]===0x47&&b[1]===0x49&&b[2]===0x46
+    const webp = b[0]===0x52&&b[1]===0x49&&b[2]===0x46&&b[3]===0x46&&b[8]===0x57&&b[9]===0x45&&b[10]===0x42&&b[11]===0x50
+    const ico = b[0]===0&&b[1]===0&&b[2]===1&&b[3]===0
+    return (mime==='image/png'&&png)||(mime==='image/jpeg'&&jpg)||(mime==='image/gif'&&gif)||(mime==='image/webp'&&webp)||((mime==='image/x-icon')&&ico)
+  } catch { return false }
+}
+
 const UNSAFE_PATH_RE = /(^|[\\/])\.\.([\\/]|$)|\\|\0/
 
 // Mirror of REMOTE_HTTP_ERROR in backend/app/services/remote_url.py (TD-31 unification).
@@ -47,12 +62,12 @@ export function classifyModuleIcon({ icon = '', source = 'url', iconData = '', m
   const data = source === 'base64' ? String(iconData || '') : ''
 
   if (data) {
-    return DATA_URI_RE.test(data) && data.length <= 65536
+    return DATA_URI_RE.test(data) && data.length <= 262144 && dataUriMagicOk(data)
       ? { type: 'base64', src: data }
       : { type: 'fallback', src: '' }
   }
   if (value.startsWith('data:')) {
-    return DATA_URI_RE.test(value) && value.length <= 65536
+    return DATA_URI_RE.test(value) && value.length <= 262144 && dataUriMagicOk(value)
       ? { type: 'base64', src: value }
       : { type: 'fallback', src: '' }
   }

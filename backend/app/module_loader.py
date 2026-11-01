@@ -35,6 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import settings
 from .services.remote_url import RemoteUrlError, normalize_remote_url
+from .services.icon_policy import IconPolicyError, validate_data_uri
 from .models import Module
 from .scheduling import (
     LEGACY_CYCLE_MAP,
@@ -229,14 +230,10 @@ class ModuleConfig(BaseModel):
         if self.icon.startswith("data:"):
             data_uri = self.icon
         if data_uri is not None:
-            if len(data_uri.encode("utf-8")) > 65536:
-                raise ValueError("Base64 图标不能超过 64KB")
-            import re
-            if not re.fullmatch(
-                r"data:image/(x-icon|png);base64,[A-Za-z0-9+/=]+",
-                data_uri,
-            ):
-                raise ValueError("图标不是合法的 Base64 图片 Data URI")
+            try:
+                validate_data_uri(data_uri)
+            except IconPolicyError as exc:
+                raise ValueError(str(exc)) from exc
         elif self.icon_source == "base64":
             raise ValueError("icon_source=base64 时必须提供 icon_data")
 

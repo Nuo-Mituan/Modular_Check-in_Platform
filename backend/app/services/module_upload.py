@@ -26,6 +26,7 @@ def _close_quietly(handle: object) -> None:
     except Exception:
         logger.debug("关闭模块上传临时文件失败", exc_info=True)
 from ..services.remote_url import RemoteUrlError, normalize_remote_url
+from .icon_policy import IconPolicyError, validate_file_extension_format
 from ..module_loader import (
     MODULE_KEY_PATTERN,
     ModuleConfig,
@@ -202,6 +203,24 @@ def _install_zip_sync(
             try:
                 normalize_remote_url(config.icon, field_label="模块图标")
             except RemoteUrlError as exc:
+                raise ModuleUploadError(str(exc)) from exc
+        elif not config.icon.startswith("data:") and not config.icon.startswith(("http://", "https://")):
+            icon_path = temp_root / config.icon.removeprefix("./")
+            try:
+                icon_path = icon_path.resolve()
+                if temp_root.resolve() not in icon_path.parents:
+                    raise ModuleUploadError("模块图标路径非法")
+                if not icon_path.is_file():
+                    data = None
+                else:
+                    data = icon_path.read_bytes()
+                if data is None:
+                    pass
+                elif len(data) > 64 * 1024:
+                    raise ModuleUploadError("图标文件过大")
+                else:
+                    validate_file_extension_format(icon_path.suffix, data)
+            except IconPolicyError as exc:
                 raise ModuleUploadError(str(exc)) from exc
 
         if target.exists():

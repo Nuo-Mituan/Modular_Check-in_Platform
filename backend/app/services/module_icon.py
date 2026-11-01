@@ -6,16 +6,13 @@ from io import BytesIO
 from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
+from .icon_policy import detect_icon_format, is_svg, SUFFIX_TO_FORMAT
 
 MAX_ICON_BYTES = 64 * 1024
 MAX_ICON_PIXELS = 1024 * 1024
 # Path-based icons: declared suffix must match the detected file signature.
 ICON_FORMAT_BY_SUFFIX = {
-    ".ico": "ICO",
-    ".png": "PNG",
-    ".jpg": "JPEG",
-    ".jpeg": "JPEG",
-    ".webp": "WEBP",
+    f".{suffix}": fmt.upper() for suffix, fmt in SUFFIX_TO_FORMAT.items()
 }
 
 
@@ -75,19 +72,10 @@ def _decode_pillow(data: bytes, fmt: str) -> bytes:
 
 def _detect_icon_format(data: bytes) -> str | None:
     """Identify the real format from magic bytes; never trust the suffix."""
-    if data[:4] == b"\x00\x00\x01\x00":
-        return "ICO"
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "PNG"
-    if data.startswith(b"\xff\xd8\xff"):
-        return "JPEG"
-    if (
-        len(data) >= 12
-        and data[:4] == b"RIFF"
-        and data[8:12] == b"WEBP"
-    ):
-        return "WEBP"
-    return None
+    fmt = detect_icon_format(data)
+    if fmt is None or is_svg(data):
+        return None
+    return {"ico": "ICO", "png": "PNG", "jpeg": "JPEG", "gif": "GIF", "webp": "WEBP"}[fmt]
 
 
 def load_icon(candidate: Path) -> tuple[bytes, str, int]:
@@ -124,7 +112,7 @@ def load_icon(candidate: Path) -> tuple[bytes, str, int]:
         height = data[7] or 256
         if not (0 < width <= 256 and 0 < height <= 256):
             raise ModuleIconInvalid()
-    if actual in {"ICO", "PNG", "JPEG", "WEBP"}:
+    if actual in {"ICO", "PNG", "JPEG", "GIF", "WEBP"}:
         # Raster icons are normalized to PNG so the response MIME always
         # matches the actual bytes, including JPEG/WebP inputs.
         return _decode_pillow(data, actual), "image/png", stat.st_mtime_ns

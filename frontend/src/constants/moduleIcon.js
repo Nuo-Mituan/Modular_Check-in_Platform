@@ -1,7 +1,11 @@
+// Mirror of backend/app/services/icon_policy.py; backend is the security boundary.
+export const ICON_ALLOWED = Object.freeze(['ico', 'png', 'jpeg', 'gif', 'webp'])
 // Single source of truth for local module icon formats.
 export const ICON_EXTENSIONS = Object.freeze([
-  'ico', 'png', 'jpg', 'jpeg', 'webp',
+  'ico', 'png', 'jpg', 'jpeg', 'gif', 'webp',
 ])
+
+export const ICON_UNSUPPORTED_DETAIL = '图标仅支持 PNG/JPEG/GIF/WebP/ICO，不支持 SVG'
 export const ICON_EXT_RE = new RegExp(
   `\\.(${ICON_EXTENSIONS.map((ext) => (ext === 'jpg' ? 'jpe?g' : ext)).join('|')})$`,
   'i',

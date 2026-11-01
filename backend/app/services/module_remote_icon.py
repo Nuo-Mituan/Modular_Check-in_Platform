@@ -24,6 +24,7 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 
 from ..config import settings
+from .icon_policy import detect_icon_format, is_svg, ICON_UNSUPPORTED_DETAIL, ICON_ALLOWED, FORMAT_TO_CONTENT_TYPE
 from .remote_url import (
     REMOTE_HTTP_ERROR,
     RemoteUrlError,
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 REMOTE_ICON_ERROR: Final = "远程图标不可用"
 REMOTE_ICON_FORMAT_ERROR: Final = "远程图标格式不支持"
 CONTENT_TYPE_ALIASES = {"image/jpg": "image/jpeg"}
-ALLOWED_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+ALLOWED_TYPES = frozenset(FORMAT_TO_CONTENT_TYPE[fmt] for fmt in ICON_ALLOWED) | {"image/vnd.microsoft.icon"}
 CACHE_MAX = 64
 NEGATIVE_MAX = 256
 
@@ -99,15 +100,10 @@ async def _validate_target(url: str) -> None:
 
 
 def _sniff(data: bytes) -> str:
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "image/png"
-    if data.startswith(b"\xff\xd8\xff"):
-        return "image/jpeg"
-    if data.startswith((b"GIF87a", b"GIF89a")):
-        return "image/gif"
-    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "image/webp"
-    raise RemoteIconError(415, REMOTE_ICON_FORMAT_ERROR)
+    fmt = detect_icon_format(data)
+    if fmt is None or is_svg(data):
+        raise RemoteIconError(415, REMOTE_ICON_FORMAT_ERROR)
+    return {"png": "image/png", "jpeg": "image/jpeg", "gif": "image/gif", "webp": "image/webp", "ico": "image/x-icon"}[fmt]
 
 
 async def _fetch(url: str) -> tuple[bytes, str, str]:
