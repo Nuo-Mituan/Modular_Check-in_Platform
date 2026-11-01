@@ -62,12 +62,8 @@ export function classifyModuleIcon({ icon = '', source = 'url', iconData = '', m
       if (parsed.protocol === 'http:' && (hasIncompleteIpLiteral(value) || !isInsecureHostAllowed(parsed.hostname))) {
         return { type: 'fallback', src: '', reason: REMOTE_HTTP_ERROR }
       }
-      // Dotted last segments (e.g. /assets/1.2) are conservatively treated as
-      // extensions and fall back unless supported; this is intentional.
-      const hasExtension = /\.[A-Za-z0-9]+$/.test(parsed.pathname)
-      if (hasExtension && !isSupportedIconExtension(parsed.pathname)) {
-        return { type: 'fallback', src: '' }
-      }
+      // Remote content is validated by the same-origin proxy via magic bytes;
+      // the URL extension is intentionally not a rendering gate (GIF/WebP).
       return { type: 'remote-url', src: value }
     } catch {
       return { type: 'fallback', src: '' }
@@ -109,6 +105,11 @@ export function classifyModuleIcon({ icon = '', source = 'url', iconData = '', m
 
 export function isImageContentType(value = '') {
   return /^image\//i.test(String(value))
+}
+
+export function remoteIconUrl(moduleId) {
+  const base = String(import.meta.env?.VITE_API_BASE || '/api').replace(/\/+$/, '')
+  return `${base}/modules/${encodeURIComponent(moduleId)}/icon`
 }
 
 export function moduleIconUrl(key, path = 'icon.ico') {

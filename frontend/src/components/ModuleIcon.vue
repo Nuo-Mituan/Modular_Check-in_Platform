@@ -23,6 +23,7 @@ import {
   classifyModuleIcon,
   isImageContentType,
   moduleIconUrl,
+  remoteIconUrl,
 } from '@/utils/moduleIcon'
 import { iconErrorMessage } from '@/utils/iconErrorMessage'
 import { looksLikeLocalPath } from '@/constants/moduleIcon'
@@ -32,6 +33,7 @@ const props = defineProps({
   source: { type: String, default: 'url' },
   iconData: { type: String, default: '' },
   moduleKey: { type: String, default: '' },
+  moduleId: { type: [Number, String], default: null },
   size: { type: [Number, String], default: 46 },
   tone: { type: [String, Number], default: 0 },
 })
@@ -98,7 +100,7 @@ async function loadLocalIcon(kind) {
 const isPathLike = computed(() => looksLikeLocalPath(props.icon || ''))
 
 watch(
-  () => [props.source, props.iconData, props.moduleKey, props.icon],
+  () => [props.source, props.iconData, props.moduleKey, props.moduleId, props.icon],
   () => {
     requestRevision += 1
     revokeObjectUrl()
@@ -122,9 +124,13 @@ watch(
       }
       return
     }
-    if (kind.type === 'base64' || kind.type === 'remote-url') {
+    if (kind.type === 'base64') {
       imageSrc.value = kind.src || ''
       failed.value = !imageSrc.value
+      return
+    }
+    if (kind.type === 'remote-url') {
+      void loadRemoteIcon()
       return
     }
     if (kind.path.startsWith('/static/')) {
@@ -135,6 +141,42 @@ watch(
   },
   { immediate: true },
 )
+
+async function loadRemoteIcon() {
+  if (props.moduleId === null || props.moduleId === undefined) {
+    failed.value = true
+    failureReason.value = 'no-module-id'
+    return
+  }
+  const revision = ++requestRevision
+  revokeObjectUrl()
+  imageSrc.value = ''
+  failed.value = false
+  try {
+    const response = await fetch(remoteIconUrl(props.moduleId), { credentials: 'include' })
+    if (!response.ok) {
+      let payload = {}
+      try { payload = await response.json() } catch { /* status fallback */ }
+      failureReason.value = iconErrorMessage({
+        status: response.status,
+        code: payload?.code,
+        detail: payload?.detail,
+      }) || '图标加载失败'
+      throw new Error(`HTTP ${response.status}`)
+    }
+    const blob = await response.blob()
+    if (revision !== requestRevision) return
+    objectUrl = URL.createObjectURL(blob)
+    imageSrc.value = objectUrl
+  } catch (error) {
+    if (revision === requestRevision) {
+      imageSrc.value = ''
+      failed.value = true
+      failureReason.value = failureReason.value || '远程图标加载失败'
+      console.warn('[ModuleIcon] remote icon load failed', { moduleId: props.moduleId, error })
+    }
+  }
+}
 
 onBeforeUnmount(() => {
   requestRevision += 1

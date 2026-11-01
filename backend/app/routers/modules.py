@@ -34,6 +34,7 @@ from ..database import SessionLocal, get_db
 from ..deps import AuthContext, get_auth_context, get_current_user
 from ..models import ExecutionLog, Module, ModuleSchedule, PushPool, User
 from ..services.remote_url import RemoteUrlError, normalize_remote_url
+from ..services.module_remote_icon import RemoteIconError, get_remote_icon
 from ..services.module_icon import (
     ModuleIconError,
     load_icon,
@@ -845,6 +846,27 @@ async def module_icon(
         key, directory, path, candidate,
     )
     return _icon_response(request, data, media_type, current_mtime)
+
+
+@router.get("/{module_id}/icon", summary="代理远程模块图标")
+async def module_remote_icon(
+    module_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    module = await _get_module_or_404(db, module_id)
+    icon = str(module.icon or "")
+    if not icon.startswith(("http://", "https://")):
+        raise HTTPException(status_code=404, detail="图标不存在")
+    try:
+        data, content_type, digest = await get_remote_icon(module.id, icon)
+    except RemoteIconError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    etag = f'"{digest}"'
+    headers = {"Cache-Control": "public, max-age=86400, immutable", "ETag": etag, "X-Content-Type-Options": "nosniff"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=data, media_type=content_type, headers=headers)
 
 
 @router.get("/{module_id}", response_model=ModuleDetail, summary="模块详情、账号与执行时间")

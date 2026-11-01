@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     sse_queue_max: int = 2_000
     upload_max_mb: int = 10
     remote_http_allow_hosts: str = "localhost,127.0.0.1"
+    remote_icon_max_bytes: int = 256 * 1024
+    remote_icon_timeout_seconds: float = 5.0
+    remote_icon_connect_timeout_seconds: float = 3.0
 
     # --------------------------------------------------------------- push
     push_skip_notice: bool = True
