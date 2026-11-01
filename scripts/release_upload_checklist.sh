@@ -21,7 +21,7 @@ for forbidden in Dockerfile.dev pytest.ini; do
   find "$PAYLOAD" -name "$forbidden" -print -quit | grep -q . && fail "forbidden dev file: $forbidden"
 done
 cd "$PAYLOAD"
-python3 -c "import hashlib,json,pathlib,sys;m=json.load(open('MANIFEST.json'));g=m.get('generator_sha256');sys.exit('generator missing') if not g else None;a=hashlib.sha256(pathlib.Path('scripts/release_snapshot.py').read_bytes()).hexdigest();sys.exit('generator mismatch') if a!=g else None;sys.exit('dist provenance missing') if m.get('dist_included') and (not m.get('dist_source') or not m.get('dist_generated_at')) else None"
+python3 -c "import hashlib,json,pathlib,sys;m=json.load(open('MANIFEST.json'));g=m.get('generator_sha256');a=hashlib.sha256(pathlib.Path('scripts/release_snapshot.py').read_bytes()).hexdigest();ok=bool(g) and a==g and (not m.get('dist_included') or (m.get('dist_source') and m.get('dist_generated_at')));print('FAIL: generator/dist provenance assertion failed', file=sys.stderr) if not ok else None;sys.exit(0 if ok else 1)"
 shasum -a 256 -c MANIFEST.sha256 > /tmp/release-sha-check.log 2>&1 || { cat /tmp/release-sha-check.log; fail "manifest checksum failed"; }
 OK_COUNT=$(grep -c ': OK$' /tmp/release-sha-check.log || true)
 FAIL_COUNT=$(grep -vc ': OK$' /tmp/release-sha-check.log || true)
@@ -36,12 +36,12 @@ python3 - <<'PY'
 import json, pathlib, sys
 m=json.load(open('MANIFEST.json'))
 if not m.get('dist_included') or m.get('dist_file_count', 0) <= 0:
-    sys.exit('manifest does not include dist')
+    print('FAIL: manifest does not include dist', file=sys.stderr); sys.exit(1)
 if m.get('stale_dist_allowed'):
-    sys.exit('stale dist is not allowed for v1.0.6')
+    print('FAIL: stale dist is not allowed for v1.0.7', file=sys.stderr); sys.exit(1)
 actual=sum(1 for p in pathlib.Path('frontend/dist').rglob('*') if p.is_file())
 if actual != m.get('dist_file_count'):
-    sys.exit(f'dist count {actual} != manifest {m.get("dist_file_count")}')
+    print(f'FAIL: dist count {actual} != manifest {m.get("dist_file_count")}', file=sys.stderr); sys.exit(1)
 PY
 PYTHONPYCACHEPREFIX=/tmp/release-pycache python3 -m compileall -q backend/app || fail "backend compile failed"
 [ -f backend/app/main.py ] || fail "backend/app/main.py missing"
@@ -54,7 +54,7 @@ p=pathlib.Path('modules/demo_checkin/config.json')
 data=json.loads(p.read_text())
 icon=str(data.get('icon',''))
 if not icon.lower().endswith(('.ico','.png','.jpg','.jpeg','.webp')):
-    sys.exit(f'unsupported icon: {icon}')
+    print(f'FAIL: unsupported icon: {icon}', file=sys.stderr); sys.exit(1)
 print('smoke: ok')
 PY
 echo "OK: $OK_COUNT files (expected_sha256_ok=$EXPECTED)"
