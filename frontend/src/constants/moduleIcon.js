@@ -1,6 +1,7 @@
 // Mirror of backend/app/services/icon_policy.py; backend is the security boundary.
 export const ICON_ALLOWED = Object.freeze(['ico', 'png', 'jpeg', 'gif', 'webp'])
 // Single source of truth for local module icon formats.
+// `jpg` is an extension alias; backend SUFFIX_TO_FORMAT maps it to jpeg.
 export const ICON_EXTENSIONS = Object.freeze([
   'ico', 'png', 'jpg', 'jpeg', 'gif', 'webp',
 ])
