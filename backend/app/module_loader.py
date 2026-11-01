@@ -34,6 +34,7 @@ from sqlalchemy import event as sa_event, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import settings
+from .core.metrics import merge_providers
 from .services.remote_url import RemoteUrlError, normalize_remote_url
 from .services.icon_policy import IconPolicyError, validate_data_uri
 from .models import Module
@@ -1142,8 +1143,7 @@ def get_stripe_contention_stats() -> dict[str, int | float]:
         "pool_total_invalidations": pool_snapshot["pool_invalidate"],
     })
     metrics.update(_get_pool_instant_metrics())
-    from .main import get_db_log_suppression_stats
-    metrics.update(get_db_log_suppression_stats())
+    metrics.update(merge_providers())
     metrics["decay_state_writable"] = _DECAY_STATE_WRITABLE
     if stale:
         return {

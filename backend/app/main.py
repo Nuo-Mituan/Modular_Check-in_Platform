@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .module_loader import DatabaseUnavailableError, flush_decay_state_on_shutdown
+from .core.metrics import register_provider
 from .database import SessionLocal, dispose_db, init_db
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
@@ -485,3 +486,5 @@ else:
                 "hint": "开发模式请运行 pnpm dev；生产模式请先构建前端或使用 Docker。",
             }
         )
+
+register_provider("db_log_suppression", get_db_log_suppression_stats)
