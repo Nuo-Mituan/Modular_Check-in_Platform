@@ -1,12 +1,12 @@
 # v1.0.7 变更说明（草案）
 
-- 版本：`1.0.7`（工作版本号仍为 1.0.6，发布前统一 bump）
+- 版本：`1.0.7`
 - 日期：2026-11-01
-- 状态：**未发布 / 待构建与 tag 流程确认**
-- 主题：图标链路安全收敛（TD-21 / TD-22 / TD-23）
+- 状态：**待发布 / 构建、快照与 MANIFEST 已通过**
+- 主题：图标链路安全收敛 + 发布与质量门禁收口
 
-> 本版本聚焦模块图标：保存侧限制明文公网 URL，拉取侧改为服务端同源代理，
-> 格式策略统一为单一来源。未引入新依赖，未改变 `Module.icon` 存储结构或 DB schema。
+> 本版本包含图标链路安全收敛、版本更新判定、发布清单闸门，以及测试/类型/分层门禁收口。
+> 未改变 `Module.icon` 存储结构或 DB schema。
 
 ## 五条行为变更
 
@@ -67,15 +67,26 @@
 **修复路径**：重新导出合规 data URI/图标并上传。
 **回退**：回退 `validate_data_uri` 与加载侧 fallback；原值未改。
 
+## 工程与发布链路
+
+- **TD-18**：新增 `.importlinter` 分层合同与 CI job；3 contracts kept、0 broken。
+- **TD-19a**：新执行不再写 `execution_logs.output`，旧行保留只读 fallback；ring 写入失败时显式告警。
+- **TD-23a**：新增公开 `GET /api/version`（ETag / Cache-Control），前端增加版本比较与升级判定纯函数及 6 条单测；OpenAPI paths 40→41。
+- **TD-23b**：`release_snapshot.py` 增加 checklist 前置闸门；`MANIFEST.json` 写入 `checklist`、`payload_checksum`、`git_commit`；失败时不生成 manifest。
+- **TD-24**：新增 ModuleIcon 组件级挂载测试（@vue/test-utils + jsdom + vitest），前端测试 31→36。
+- **TD-26**：全量 mypy 从 9 errors / 2 files 清零。
+- **TD-27 / TD-29 / TD-31**：版本单一来源与 baseline、npm lockfile 门禁、checklist 失败统一 `FAIL:` 前缀。
+- **TD-25**：项目标识统一为 `modular-checkin-platform`；旧镜像名无过渡 alias，迁移见 `docs/MIGRATION_v1.0.7.md`。
+
 ## 验证摘要
 
-- 后端：281 passed，1 failed（既有 `test_noop_batch_restores_outbox_audit`，改前基线同失败）
+- 后端：284 passed，1 failed（既有 `test_noop_batch_restores_outbox_audit`，基线白名单）
 - PBT：5 passed
-- 前端：29 passed
-- mypy：61 source files，9 个既有错误（`push_delivery.py` / `bootstrap.py`），本轮新文件无新增
-- OpenAPI：TD-23 无变更；TD-22 新增 `GET /api/modules/{module_id}/icon`
-- 前端单元测试：29 passed；生产构建：**未验证**
-- `frontend/dist`：未纳入 v1.0.7 payload
+- 前端：42 passed（Node 37 + 组件 5）
+- mypy：61 source files，0 errors
+- OpenAPI：paths=41，breaking=0；TD-22 新增 `GET /api/modules/{module_id}/icon`，TD-23a 新增 `GET /api/version`
+- 前端单元测试：42 passed；生产构建：exit 0，版本注入 1.0.7，产物无 `"dev"`
+- `frontend/dist`：已纳入 v1.0.7 payload，`shasum -c` OK
 
 ## 已知限制
 
@@ -83,7 +94,8 @@
 - 旧公网 http 远程图标需重新上传 https 图标；
 - ICO 在现代浏览器/预览场景的兼容性弱于 PNG/GIF/WebP，但本轮保留 ICO；
 - 模块图标没有独立 URL 编辑表单，修复远程 URL 需重新上传 ZIP；
-- 全量测试仍有 1 个既有失败，合并前需单独确认；
+- 全量测试仍有 1 个既有失败（`test_noop_batch_restores_outbox_audit`），已列入基线白名单；
+- `test_sync_modules_different_keys_concurrent` 存在偶发并发失败，单跑/重跑通过，后续固化；
 - TD-32 自定义推送驱动 URL 策略仍未实施。
 
 ## 回退说明
