@@ -27,8 +27,9 @@ async def seed_admin() -> bool:
                 if admin is not None and not admin.password_must_change:
                     admin.password_must_change = True
                     await db.commit()
-                    sys.__stdout__.write("⚠️ [INIT] Existing admin forced to change password on next login.\n")
-                    sys.__stdout__.flush()
+                    if sys.__stdout__ is not None:
+                        sys.__stdout__.write("⚠️ [INIT] Existing admin forced to change password on next login.\n")
+                        sys.__stdout__.flush()
             return False
 
         username = (settings.admin_user or "admin").strip()[:64] or "admin"
@@ -39,8 +40,9 @@ async def seed_admin() -> bool:
         else:
             password = secrets.token_urlsafe(12)
             must_change = True
-            sys.__stdout__.write(f"\n🔑 [INIT] Generated admin password: {password}\n")
-            sys.__stdout__.flush()
+            if sys.__stdout__ is not None:
+                sys.__stdout__.write(f"\n🔑 [INIT] Generated admin password: {password}\n")
+                sys.__stdout__.flush()
         db.add(
             User(
                 username=username,

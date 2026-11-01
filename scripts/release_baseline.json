@@ -10,11 +10,8 @@
   ],
   "pytest_skipped_allow": 0,
   "pytest_deselected_allow": 8,
-  "mypy_total_max": 9,
-  "mypy_known_error_files": [
-    "backend/app/services/push_delivery.py",
-    "backend/app/services/bootstrap.py"
-  ],
+  "mypy_total_max": 0,
+  "mypy_known_error_files": [],
   "frontend_tests_min": 36,
   "openapi_breaking_allow": [],
   "lockfile_manager": "npm",

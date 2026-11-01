@@ -110,8 +110,8 @@ async def _send_supplement(
         "summary": message,
         "details": f"批次 {cycle_id} 已汇总，补发本条手动补执行结果",
     }
-    title = render_template(config["title_template"], variables)
-    body = render_template(config["body_template"], variables)
+    title = render_template(config["title_template"], variables)  # type: ignore[arg-type]  # TypedDict value invariance; runtime only reads
+    body = render_template(config["body_template"], variables)  # type: ignore[arg-type]  # TypedDict value invariance; runtime only reads
     key = make_idempotency_key(
         "supplement", cycle_id, module_id, message, clock.time_ns()
     )
@@ -133,7 +133,7 @@ async def _send_supplement(
         record_id = record.id
     result = await send_message(
         config["channel"],
-        config["config"],
+        config["config"],  # type: ignore[arg-type]  # TypedDict value invariance; runtime only reads
         title,
         body,
         idempotency_key=key,
@@ -194,7 +194,7 @@ async def recover_pending_supplements() -> int:
     for record_id, title, body, key, created_at in pending:
         try:
             result = await send_message(
-                config["channel"], config["config"], title, body,
+                config["channel"], config["config"], title, body,  # type: ignore[arg-type]  # TypedDict value invariance
                 idempotency_key=key,
             )
             async with SessionLocal() as db:
@@ -240,7 +240,7 @@ async def _supplement_after_flush(
 async def _load_push_config() -> dict[str, object]:
     try:
         async with SessionLocal() as config_db:
-            return await load_push_config(config_db)
+            return await load_push_config(config_db)  # type: ignore[return-value]  # runtime shape is PushConfigData
     except PushConfigError as exc:
         logger.warning("推送配置预加载失败，按未配置处理：%s", exc)
         return {"channel": "none", "config": {}}
