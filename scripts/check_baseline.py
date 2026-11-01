@@ -61,7 +61,11 @@ def check_mypy(bl: dict) -> None:
     m = re.search(r"Found (\d+) errors? in (\d+) files?", out)
     total = int(m.group(1)) if m else 0
     files = set(re.findall(r"^(backend/app/[^:]+):\d+: error:", out, re.M))
-    new = files - set(bl["mypy_known_error_files"])
+    known = set(bl["mypy_known_error_files"])
+    for f in known:
+        if not (ROOT / f).is_file():
+            print(f"WARN: mypy_known_error_files 路径不存在，可清理: {f}")
+    new = files - known
     if total > bl["mypy_total_max"] or new:
         die(f"mypy errors={total}, new_files={sorted(new)}")
     print(f"ok: mypy errors={total} in {len(files)} files; 新增文件错误=0")
@@ -109,34 +113,65 @@ def check_openapi(bl: dict, *, regenerate: bool = False) -> None:
 
 
 def check_versions(bl: dict) -> None:
-    def txt(p: str) -> str:
-        return (ROOT / p).read_text(encoding="utf-8")
-    main = re.search(r'^__version__\s*=\s*["\'](.+?)["\']', txt("backend/app/__init__.py"), re.M)
-    if not main:
-        die("无法读取 __version__")
-    v = main.group(1)
-    checks = [
-        ("pyproject", re.search(r'^version\s*=\s*["\'](.+?)["\']', txt("pyproject.toml"), re.M)),
-        ("package", json.loads(txt("frontend/package.json")).get("version")),
-        ("package-lock", json.loads(txt("frontend/package-lock.json")).get("version")),
-        ("baseline", bl.get("version")),
-        ("openapi", load(ROOT / "scripts/openapi_base.json").get("info", {}).get("version")),
-    ]
+    """Version equality chain: Python side, npm side, cross-side."""
+    def _re(text: str, pat: str):
+        m = re.search(pat, text, re.M)
+        return m.group(1) if m else None
+    items: dict[str, str | None] = {}
+    items["backend/app/__init__.py (__version__)"] = _re(
+        (ROOT / "backend/app/__init__.py").read_text(encoding="utf-8"),
+        r'^__version__\s*=\s*["\']([^"\']+)["\']',
+    )
+    items["pyproject.toml"] = _re(
+        (ROOT / "pyproject.toml").read_text(encoding="utf-8"),
+        r'^version\s*=\s*["\']([^"\']+)["\']',
+    )
+    items["frontend/package.json"] = json.loads((ROOT / "frontend/package.json").read_text(encoding="utf-8")).get("version")
+    lockp = ROOT / "frontend/package-lock.json"
+    items["frontend/package-lock.json"] = json.loads(lockp.read_text(encoding="utf-8")).get("version") if lockp.is_file() else None
     for f in ("Dockerfile", "Dockerfile.dev"):
-        vals = set(re.findall(r'version\s*=\s*["\']?([^"\'\s]+)', txt(f), re.I))
-        checks.append((f, vals.pop() if len(vals) == 1 else "missing/ambiguous"))
-    for f, label in [("frontend/src/layouts/AppLayout.vue", "AppLayout"), ("frontend/src/views/LoginView.vue", "LoginView")]:
-        if "VITE_APP_VERSION" in txt(f):
-            checks.append((label, v))
-        else:
-            m = re.search(r"(['\"])(\d+\.\d+\.\d+)\1", txt(f))
-            checks.append((label, m.group(2) if m else "missing"))
+        text = (ROOT / f).read_text(encoding="utf-8") if (ROOT / f).is_file() else ""
+        vals = set(re.findall(r'version\s*=\s*["\']?([^"\'\s\n]+)', text, re.I))
+        items[f"{f} LABEL"] = next(iter(vals)) if len(vals) == 1 else (",".join(sorted(vals)) if vals else None)
     notes = sorted((ROOT / "docs").glob("RELEASE_NOTES_v*.md"))
-    checks.append(("notes", notes[-1].stem.split("_v")[-1] if notes else "missing"))
-    bad = [(n, x.group(1) if hasattr(x, "group") else x) for n, x in checks if (x.group(1) if hasattr(x, "group") else x) != v]
-    if bad:
-        die(f"版本不一致（主轴 {v}）: {bad}")
-    print(f"ok: 版本交叉校验全部 = {v}")
+    items["RELEASE_NOTES 文件名"] = notes[-1].stem.rsplit("_", 1)[-1].replace("v", "") if notes else None
+    items["baseline.json"] = str(bl.get("version"))
+    bp = ROOT / "scripts/openapi_base.json"
+    items["openapi_base info.version"] = json.loads(bp.read_text(encoding="utf-8")).get("info", {}).get("version") if bp.is_file() else None
+    groups: dict[str, list[str]] = {}
+    for k, v in items.items():
+        groups.setdefault(v or "<缺失>", []).append(k)
+    if len(groups) == 1:
+        print(f"ok: 版本等式链全部 = {next(iter(groups))}")
+        return
+    for v, ks in sorted(groups.items(), key=lambda x: x[0] or ""):
+        print(f"  [{v}] {ks}", file=sys.stderr)
+    die("版本等式链断裂（Python 侧与 npm 侧需分别同步后重新断言）")
+
+
+def check_lockfile(bl: dict) -> None:
+    """L2 lockfile consistency gate; read-only."""
+    fe = ROOT / "frontend"
+    pkg = fe / "package.json"
+    lock = fe / "package-lock.json"
+    manager = bl.get("lockfile_manager", "npm")
+    if not lock.is_file():
+        die("package-lock.json 缺失；请先执行 npm ci / npm install 生成 lockfile")
+    for name in bl.get("forbidden_lockfiles", []):
+        p = fe / name
+        if p.is_file() and p.stat().st_size > 0:
+            die(f"检测到不受支持的 lockfile: {name}（本项目仅支持 {manager}）")
+    try:
+        pv = json.loads(pkg.read_text(encoding="utf-8"))["version"]
+        lv = json.loads(lock.read_text(encoding="utf-8")).get("version")
+    except Exception as exc:
+        die(f"读取 package version 失败: {exc}")
+    if lv != pv:
+        die(f"lockfile version({lv}) != package.json version({pv})；执行 npm install 同步")
+    lvv = json.loads(lock.read_text(encoding="utf-8")).get("lockfileVersion")
+    if lvv not in (2, 3):
+        print(f"WARN: package-lock.json lockfileVersion={lvv} 非预期 2/3（未阻断）")
+    print(f"ok: lockfile 一致 (manager={manager}, package={pv}, lock.version={lv})")
 
 
 def check_tech_debt() -> None:
@@ -163,6 +198,7 @@ def main() -> int:
     check_mypy(bl)
     check_openapi(bl)
     check_versions(bl)
+    check_lockfile(bl)
     check_tech_debt()
     print("check_baseline: ALL PASS")
     return 0

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-VERSION="${1:-1.0.6}"
+VERSION="${1:-1.0.7}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PAYLOAD="$ROOT/Releases/v${VERSION}"
 fail() { echo "FAIL: $*" >&2; exit 1; }
+step() { echo "== $* =="; }
 
 [ -d "$PAYLOAD" ] || fail "payload missing: $PAYLOAD"
 [ -f "$PAYLOAD/frontend/dist/index.html" ] || fail "frontend dist missing; build and inject with --dist-source first"
@@ -58,6 +59,20 @@ print('smoke: ok')
 PY
 echo "OK: $OK_COUNT files (expected_sha256_ok=$EXPECTED)"
 shasum -a 256 MANIFEST.sha256
+step "syntax/version lint"
+if grep -rnE "(^|[^a-zA-Z0-9_])1\.0\.[0-9]+" frontend/src --include="*.vue" --include="*.ts" --include="*.js" 2>/dev/null | grep -v "import.meta.env" | grep -qv "version"; then
+  fail "前端源码存在硬编码版本串，应使用 VITE_APP_VERSION"
+fi
+
+step "lockfile and build"
+if command -v npm >/dev/null 2>&1; then
+  (cd frontend && npm ci --include=optional) || fail "npm ci 失败"
+  [ -f "$PAYLOAD/frontend/dist/index.html" ] || fail "frontend dist missing"
+else
+  echo "SKIP: npm 不可用，lockfile 真实性与构建留待 Node/CI 补证" >&2
+fi
+
+cd "$ROOT"
 echo "step: baseline gate"
 if ! "${PYTHON_BIN:-python3}" scripts/check_baseline.py --baseline scripts/release_baseline.json; then
   fail "见 check_baseline.py 输出"
