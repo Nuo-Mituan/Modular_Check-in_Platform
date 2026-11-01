@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from ..config import settings
 from ..database import SessionLocal
@@ -20,6 +22,7 @@ from ..schemas import (
     RuntimeMetricsOut,
     SystemLogOut,
     SystemLogPage,
+    VersionInfoOut,
 )
 from ..scheduling import CYCLE_LABELS, REPEAT_CYCLES
 from ..services.maintenance import purge_old_logs
@@ -50,6 +53,28 @@ meta_router = APIRouter(
     tags=["系统"],
     dependencies=[Depends(get_current_user)],
 )
+
+
+@health_router.get("/version", response_model=VersionInfoOut, summary="版本与更新判定信息")
+async def version_info(request: Request, response: Response) -> VersionInfoOut:
+    now = datetime.now(timezone.utc).isoformat()
+    etag = f'"v{settings.app_version}"'
+    response.headers["Cache-Control"] = "public, max-age=60"
+    response.headers["ETag"] = etag
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=dict(response.headers))
+    return VersionInfoOut(
+        version=settings.app_version,
+        build_time=os.environ.get("BUILD_TIME", now),
+        git_commit=os.environ.get("GIT_COMMIT", "unknown"),
+        min_supported_client=os.environ.get("MIN_SUPPORTED_CLIENT", "1.0.0"),
+        recommended=True,
+        release_notes_url=f"/Releases/v{settings.app_version}/RELEASE_NOTES.md",
+        payload_checksum=os.environ.get("PAYLOAD_CHECKSUM") or None,
+        payload_bytes=int(os.environ["PAYLOAD_BYTES"]) if os.environ.get("PAYLOAD_BYTES") else None,
+        environment=os.environ.get("APP_ENV", "production"),
+    )
 
 
 @meta_router.get("", response_model=MetaOut, summary="系统信息")

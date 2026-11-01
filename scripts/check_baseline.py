@@ -117,6 +117,9 @@ def check_openapi(bl: dict, *, regenerate: bool = False) -> None:
     hard = [x for x in br if x not in allow]
     if hard:
         die(f"OpenAPI breaking: {hard}")
+    max_paths = bl.get("openapi_paths_max", len(cp))
+    if len(cp) > max_paths:
+        die(f"OpenAPI paths={len(cp)} > openapi_paths_max={max_paths}")
     print(f"ok: OpenAPI breaking=0, non-breaking={len(nbr)}, paths={len(cp)}")
 
 

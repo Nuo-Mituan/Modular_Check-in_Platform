@@ -16,7 +16,7 @@
 > **Batch 3 状态（2026-10-20）**：TD-06 / TD-13 / TD-14 / TD-16 / TD-20 已完成。
 > 环形日志改为单写线程 + 有界队列；SSE 指标/重连滞后可查询；心跳可配置；新增只读系统日志页。
 
-### 已完成（26）
+### 已完成（27）
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -43,14 +43,14 @@
 | ✅ | TD-16 | P3 | `routers/logs.py` | SSE keep-alive 固定 15 秒 | 不适合特殊代理 | 配置化 | 日志维护者 |
 | ✅ | TD-17 | P3 | `services/module_upload.py` | 临时文件 close 异常被静默忽略 | 极端文件句柄问题无日志 | 记录 debug 日志 | 模块维护者 |
 
-### 待清零（3）
+### 待清零（2）
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | ⬜ | TD-23 | P1 | `Releases/` / CI | 发布清单与版本更新判定缺失；无 manifest/latest/上传脚本。**覆盖上传 ≠ 客户端版本更新判定**，当前无任何更新判定机制 | 客户端无法判断新版本，发布流程依赖人工 | 设计最小版本清单、checksum、CI 覆盖上传与更新检查 | 发布负责人 |
 | ✅ | TD-24 | P2 | `frontend/src/components/ModuleIcon.vue` | 无组件级挂载测试；当前仅共享函数 + 源码 wiring 测试 | 组件回归可能漏测 | 引入 Vue Test Utils，覆盖 415/413/code/detail/fallback | 前端维护者 |
 | ✅ | TD-25 | P2 | `pyproject.toml` / Docker / 包名 | 项目标识 B 类改名未执行（package/image/import/CI 工件） | 与旧名共存，影响长期品牌与依赖引用 | 1.0.7 设计迁移与别名兼容；Alembic/表名不改 | 平台维护者 |
-| ⬜ | TD-18 | P3 | 全项目 | 未接入 import-linter / mypy / ruff CI | 回归依赖人工 | CI 增加 import-linter、mypy（渐进）、ruff | 平台维护者 |
+| ✅ | TD-18 | P3 | 全项目 | 未接入 import-linter / mypy / ruff CI | 回归依赖人工 | CI 增加 import-linter、mypy（渐进）、ruff | 平台维护者 |
 | ⬜ | TD-19 | P3 | `services/execution.py` | 旧 `execution_logs.output` 字段保留 | 数据模型有历史包袱 | 下个大版本迁移后移除 | 平台维护者 |
 | ✅ | TD-26 | P3 | `backend/app/services/push_delivery.py` / `bootstrap.py` | 全量 mypy 9 个既有错误 | 门禁例外长期存在 | 逐个修复并恢复全量 mypy 门禁 | 平台维护者 |
 | ✅ | TD-31 | P3 | `scripts/release_upload_checklist.sh` | checklist 的 Python 断言块失败时未统一输出 `FAIL:` 前缀 | 自动化日志可读性不足 | 统一断言失败前缀，归 v1.0.7 | 发布负责人 |
@@ -67,7 +67,7 @@
 
 ### v1.0.7 技术债核对结论（2026-11-01）
 
-- 已完成：**26 项**；待清零：**3 项**；已关闭：**2 项**（总数 31）。
+- 已完成：**27 项**；待清零：**2 项**；已关闭：**2 项**（总数 31）。
 - 差异说明：`TECH_DEBT_CLEARANCE_PLAN.md` 记录 RC6-TD-01~20 已全部清零，但本次核对确认
   TD-18（CI 缺 import-linter）与 TD-19（`backend/app/models.py` 仍保留废弃的
   `execution_logs.output` 字段）不标为已完成。
@@ -98,6 +98,26 @@
   TD-25 随同入库转正。
 - TD-32（待登记，不计入当前 31 项口径）：`release_baseline.json` 按域拆分为
   pytest/openapi/mypy/lockfile 多文件，避免再次跨主题冲突。
+
+## TD-23a 记录
+
+- 2026-11-01：`GET /api/version` 已实现，返回版本、build_time、min_supported_client、
+  release_notes_url、environment，带 ETag/Cache-Control/nosniff；OpenAPI paths 40→41。
+- 前端纯函数 `compareVersions` / `shouldUpdate` 与 6 个单测已完成。
+- TD-23b（release checklist --json + snapshot 前置 gate）尚未实施；TD-23 整体仍 ⬜。
+
+## TD-18 验收记录
+
+- 2026-11-01：新增 `.importlinter` 与 `.github/workflows/import-linter.yml`。
+  `lint-imports` 分析 61 files / 246 dependencies，3 contracts kept、0 broken。
+- 保留 2 条 legacy ignore（bootstrap→module_loader、module_loader→app.main），
+  原因是 module_loader 的 metrics accessor 历史上懒加载 app.main；后续拆分 metrics
+  服务时移除。
+
+## TD-19a 记录
+
+- 2026-11-01：TD-19a 完成「停止新写入 + 保留旧读取 fallback」；`execution_logs.output` 列与 API 兼容保留，删列/回填留待 TD-19b（v1.0.8/v2.0）。TD-19 整体仍为 ⬜，不计入完成数。
+- ring 写入失败时不再回写 output，而是在 `message` 加警告并写 error 日志；旧行 fallback 仍可读。
 
 ## TD-27/TD-29 验收记录
 
@@ -181,8 +201,8 @@ v1.0.7 第一周必须完成以下评估并给出排期：
 ## 自检数据
 
 ```text
-已完成标记数：26
-待清零标记数：3
+已完成标记数：27
+待清零标记数：2
 修改文件：docs/TECH_DEBT.md
 未修改：任何源码、测试、Releases/v1.0.6/
 ```

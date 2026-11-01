@@ -1,7 +1,7 @@
 {
   "_policy": "基线数字修改必须单独提交并附证据；例外：因本轮新增测试文件导致的 passed 数增加，可与该测试同 commit，并在 commit msg 注明原因。",
   "version": "1.0.7",
-  "pytest_passed_min": 282,
+  "pytest_passed_min": 284,
   "pytest_failed_allow": [
     {
       "id": "test_noop_batch_restores_outbox_audit",
@@ -12,11 +12,12 @@
   "pytest_deselected_allow": 8,
   "mypy_total_max": 0,
   "mypy_known_error_files": [],
-  "frontend_tests_min": 36,
+  "frontend_tests_min": 37,
   "openapi_breaking_allow": [],
   "lockfile_manager": "npm",
   "forbidden_lockfiles": [
     "pnpm-lock.yaml",
     "yarn.lock"
-  ]
+  ],
+  "openapi_paths_max": 41
 }

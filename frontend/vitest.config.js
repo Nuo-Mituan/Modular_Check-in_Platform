@@ -12,6 +12,6 @@ export default defineConfig({
     include: ['tests/**/*.test.mjs'],
     exclude: ['tests/**/module-icon.test.mjs', 'tests/**/module-icon-error-wiring.test.mjs',
       'tests/**/unified-timeout-settings.test.mjs', 'tests/**/http-error-message.test.mjs',
-      'tests/**/icon-error-message.test.mjs'],
+      'tests/**/icon-error-message.test.mjs', 'tests/**/version-check.test.mjs'],
   },
 })

@@ -2581,6 +2581,71 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "VersionInfoOut": {
+        "properties": {
+          "build_time": {
+            "title": "Build Time",
+            "type": "string"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "git_commit": {
+            "title": "Git Commit",
+            "type": "string"
+          },
+          "min_supported_client": {
+            "title": "Min Supported Client",
+            "type": "string"
+          },
+          "payload_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload Bytes"
+          },
+          "payload_checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload Checksum"
+          },
+          "recommended": {
+            "title": "Recommended",
+            "type": "boolean"
+          },
+          "release_notes_url": {
+            "title": "Release Notes Url",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "build_time",
+          "git_commit",
+          "min_supported_client",
+          "recommended",
+          "release_notes_url",
+          "environment"
+        ],
+        "title": "VersionInfoOut",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -4722,6 +4787,27 @@
           }
         ],
         "summary": "只读运行时指标",
+        "tags": [
+          "系统"
+        ]
+      }
+    },
+    "/api/version": {
+      "get": {
+        "operationId": "version_info_api_version_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "版本与更新判定信息",
         "tags": [
           "系统"
         ]

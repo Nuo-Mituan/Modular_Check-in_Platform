@@ -429,3 +429,15 @@ class DatabaseUnavailableResponse(BaseModel):
         description="Human-readable error message",
         examples=["数据库连接异常，请稍后重试"],
     )
+
+
+class VersionInfoOut(BaseModel):
+    version: str
+    build_time: str
+    git_commit: str
+    min_supported_client: str
+    recommended: bool
+    release_notes_url: str
+    payload_checksum: str | None = None
+    payload_bytes: int | None = None
+    environment: str

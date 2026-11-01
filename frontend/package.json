@@ -9,7 +9,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "test:unit": "node --test tests/*.test.mjs",
     "test:component": "vitest run --config vitest.config.js",
-    "test": "node --test tests/http-error-message.test.mjs tests/icon-error-message.test.mjs tests/module-icon-error-wiring.test.mjs tests/module-icon.test.mjs tests/unified-timeout-settings.test.mjs && npm run test:component"
+    "test": "node --test tests/http-error-message.test.mjs tests/icon-error-message.test.mjs tests/module-icon-error-wiring.test.mjs tests/module-icon.test.mjs tests/unified-timeout-settings.test.mjs tests/version-check.test.mjs && npm run test:component"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
