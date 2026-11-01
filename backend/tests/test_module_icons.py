@@ -144,9 +144,15 @@ def test_icon_config_base64_and_backward_compatibility() -> None:
     local = ModuleConfig(name="local", icon="./favicon.ico")
     assert local.icon == "./favicon.ico"
     with pytest.raises(ValidationError):
-        ModuleConfig(name="xss", icon_source="base64", icon_data="javascript:alert(1)")
+        ModuleConfig.model_validate(
+            {"name": "xss", "icon_source": "base64", "icon_data": "javascript:alert(1)"},
+            context={"strict_icon": True},
+        )
     with pytest.raises(ValidationError):
-        ModuleConfig(name="big", icon_source="base64", icon_data="data:image/png;base64," + "A" * 65536)
+        ModuleConfig.model_validate(
+            {"name": "big", "icon_source": "base64", "icon_data": "data:image/png;base64," + "A" * 262144},
+            context={"strict_icon": True},
+        )
 
 
 @pytest.mark.asyncio

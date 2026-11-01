@@ -11,6 +11,9 @@ from .icon_policy import detect_icon_format, is_svg, SUFFIX_TO_FORMAT
 MAX_ICON_BYTES = 64 * 1024
 MAX_ICON_PIXELS = 1024 * 1024
 # Path-based icons: declared suffix must match the detected file signature.
+# Values are Pillow Image.format names (uppercase), used only for comparison
+# and decode dispatch. Serving always returns image/png; do not align these
+# values with FORMAT_TO_CONTENT_TYPE (which uses lowercase proxy keys).
 ICON_FORMAT_BY_SUFFIX = {
     f".{suffix}": fmt.upper() for suffix, fmt in SUFFIX_TO_FORMAT.items()
 }

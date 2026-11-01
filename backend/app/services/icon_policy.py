@@ -47,6 +47,8 @@ def detect_icon_format(data: bytes) -> str | None:
 
 
 def is_svg(data: bytes) -> bool:
+    # The substring check covers BOM/XML prolog variants (e.g. \xef\xbb\xbf<svg>);
+    # do not remove it as a redundant optimization.
     head = data.lstrip()[:512].lower()
     return b"<svg" in head and (head.startswith(b"<?xml") or head.startswith(b"<svg"))
 

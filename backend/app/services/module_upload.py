@@ -198,7 +198,7 @@ def _install_zip_sync(
             raise ModuleUploadError("解压后未找到 config.json")
         if not (temp_root / "main.py").is_file():
             raise ModuleUploadError("解压后未找到 main.py")
-        config = parse_config_file(temp_root / "config.json")
+        config = parse_config_file(temp_root / "config.json", strict_icon=True)
         if config.icon.startswith(("http://", "https://")):
             try:
                 normalize_remote_url(config.icon, field_label="模块图标")

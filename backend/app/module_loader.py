@@ -28,7 +28,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, model_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import event as sa_event, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -199,7 +199,14 @@ class ModuleConfig(BaseModel):
     params: list[ModuleParam] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_config(self) -> "ModuleConfig":
+    def validate_config(self, info: ValidationInfo) -> "ModuleConfig":
+        """Validate config; strict_icon is set only by upload/save callers.
+
+        Non-strict (load/scan) invalid icon data is cleared **on this parsed
+        object only**; it is never written back to the DB or config.json. The
+        original value therefore remains unchanged and warns again next load.
+        """
+        strict_icon = bool((info.context or {}).get("strict_icon"))
         if len(self.params) > MAX_PARAMS:
             raise ValueError(f"参数数量不能超过 {MAX_PARAMS} 个")
         seen: set[str] = set()
@@ -233,9 +240,20 @@ class ModuleConfig(BaseModel):
             try:
                 validate_data_uri(data_uri)
             except IconPolicyError as exc:
-                raise ValueError(str(exc)) from exc
+                if strict_icon:
+                    raise ValueError(str(exc)) from exc
+                logger.warning("旧模块图标 data URI 不合规，按 fallback 加载：%s", exc)
+                self.icon = ""
+                self.icon_data = None
+                self.icon_source = "url"
+                data_uri = None
         elif self.icon_source == "base64":
-            raise ValueError("icon_source=base64 时必须提供 icon_data")
+            if strict_icon:
+                raise ValueError("icon_source=base64 时必须提供 icon_data")
+            logger.warning("旧模块 icon_source=base64 缺少 icon_data，按 fallback 加载")
+            self.icon = ""
+            self.icon_data = None
+            self.icon_source = "url"
 
         # Backward compatibility: derive a reasonable daily window from a simple
         # legacy cron expression when the new fields were not supplied.
@@ -307,7 +325,7 @@ def format_validation_error(exc: ValidationError) -> str:
     return "；".join(messages) or "配置格式不正确"
 
 
-def parse_config_file(path: Path) -> ModuleConfig:
+def parse_config_file(path: Path, *, strict_icon: bool = False) -> ModuleConfig:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -323,7 +341,7 @@ def parse_config_file(path: Path) -> ModuleConfig:
     if not isinstance(raw, dict):
         raise ModuleConfigError("config.json 顶层必须是一个对象")
     try:
-        return ModuleConfig.model_validate(raw)
+        return ModuleConfig.model_validate(raw, context={"strict_icon": strict_icon})
     except ValidationError as exc:
         raise ModuleConfigError(f"config.json 校验失败：{format_validation_error(exc)}") from exc
 
