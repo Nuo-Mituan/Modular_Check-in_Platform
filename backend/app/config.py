@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app import __version__
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 logger = logging.getLogger(__name__)
 
@@ -25,7 +27,7 @@ class Settings(BaseSettings):
 
     # ---------------------------------------------------------------- basics
     app_name: str = "签到云台"
-    app_version: str = "1.0.6"
+    app_version: str = __version__
     api_prefix: str = "/api"
     timezone: str = "Asia/Shanghai"
 

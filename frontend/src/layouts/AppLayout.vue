@@ -44,7 +44,7 @@
         </div>
         <div class="sidebar-foot">
           <span>Self-hosted</span>
-          <span class="version">v{{ appStore.meta?.version || '1.0.6' }}</span>
+          <span class="version">v{{ appStore.meta?.version || APP_VERSION }}</span>
         </div>
       </div>
     </aside>
@@ -157,6 +157,7 @@
 </template>
 
 <script setup>
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'dev'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'

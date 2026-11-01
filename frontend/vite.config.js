@@ -5,6 +5,11 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
+    define: {
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.VITE_APP_VERSION || 'dev'),
+      'import.meta.env.VITE_API_BASE': JSON.stringify(process.env.VITE_API_BASE || '/api'),
+      'import.meta.env.VITE_APP_ENV': JSON.stringify(process.env.VITE_APP_ENV || mode),
+    },
     plugins: [vue()],
     resolve: {
       alias: {

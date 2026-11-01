@@ -1,9 +1,9 @@
 # 签到云台 · Modular Check-in Platform
 
-> ## v1.0.6 Release
+> ## v1.0.7 Release
 >
-> 本次 v1.0.6 版本包含统一环形日志、AES-256-GCM v2 安全基础、推送驱动与独立/统一推送、
-> 开发者模式，以及模块图标系统。v1.0.6 移除模块 SVG 图标支持（`.svg` 返回 415），
+> 本次 v1.0.7 版本包含统一环形日志、AES-256-GCM v2 安全基础、推送驱动与独立/统一推送、
+> 开发者模式，以及模块图标系统。v1.0.7 移除模块 SVG 图标支持（`.svg` 返回 415），
 > 图标支持集统一为 PNG/JPG/JPEG/WebP/ICO；图标错误新增稳定 `code` 字段。
 >
 > - 发布与变更管制：[docs/RELEASE_POLICY.md](docs/RELEASE_POLICY.md)
@@ -128,7 +128,7 @@ docker compose logs -f checkin-platform
 ```text
 调度器已启动，时区=Asia/Shanghai
 模块同步完成：新增 2，更新 0，异常 0
-签到云台 v1.0.6 启动完成 | 模块 2 | 已排程 0 | 时区 Asia/Shanghai
+签到云台 v1.0.7 启动完成 | 模块 2 | 已排程 0 | 时区 Asia/Shanghai
 ```
 
 ### 3. 访问

@@ -1,0 +1,20 @@
+{
+  "_policy": "基线数字修改必须单独提交并附证据，禁止与功能改动混入同一 commit",
+  "version": "1.0.7",
+  "pytest_passed_min": 282,
+  "pytest_failed_allow": [
+    {
+      "id": "test_noop_batch_restores_outbox_audit",
+      "reason": "outbox audit 幂等性断言，待独立修复"
+    }
+  ],
+  "pytest_skipped_allow": 0,
+  "pytest_deselected_allow": 8,
+  "mypy_total_max": 9,
+  "mypy_known_error_files": [
+    "backend/app/services/push_delivery.py",
+    "backend/app/services/bootstrap.py"
+  ],
+  "frontend_tests_min": 29,
+  "openapi_breaking_allow": []
+}

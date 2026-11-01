@@ -176,7 +176,7 @@ import { useAuthStore } from '@/stores/auth'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const version = '1.0.6'
+const version = import.meta.env.VITE_APP_VERSION || 'dev'
 
 const formRef = ref(null)
 const submitting = ref(false)
