@@ -12,6 +12,7 @@ TARGET_GID = int(os.environ.get("PGID", "10001"))
 PRIVATE_DIRS = [
     Path(os.environ.get("DATA_DIR", "/app/data")),
     Path(os.environ.get("LOGS_DIR", "/app/logs")),
+    Path(os.environ.get("DOWN_DIR", "/app/down")),
     Path(os.environ.get("MODULES_DIR", "/app/modules")),
     Path("/app/app/push_drivers/custom"),
 ]
