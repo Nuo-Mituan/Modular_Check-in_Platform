@@ -59,7 +59,7 @@ bash verify_docker.sh
 
 - 镜像构建成功；
 - 容器以 PUID 非 root 运行；
-- `/app/data`、`/app/logs` 权限 700；
+- `/app/data`、`/app/logs`、`/app/down` 权限 700；
 - SQLite 600；
 - 全部 API 验证通过；
 - 未认证隐私检查通过。

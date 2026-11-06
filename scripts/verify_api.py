@@ -8,9 +8,10 @@ imports the application modules to run the real migration function:
 
 For a local backend (this script mutates runtime data, so use a disposable
 verification database; the multi-account test expects 1 second account gaps;
-DATA_DIR/MODULES_DIR/LOGS_DIR/SECRET_KEY must match the running server):
+DATA_DIR/MODULES_DIR/LOGS_DIR/DOWN_DIR/SECRET_KEY must match the running server):
 
     DATA_DIR=/path/to/data MODULES_DIR=/path/to/modules LOGS_DIR=/path/to/logs \
+    DOWN_DIR=/path/to/down \
     SECRET_KEY=the-same-secret \
     VERIFY_BASE_URL=http://127.0.0.1:5000/api \
     ADMIN_USER=admin ADMIN_PASS=<random-initial-password> \

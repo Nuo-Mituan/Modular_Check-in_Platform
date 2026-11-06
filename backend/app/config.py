@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     data_dir: Path = PROJECT_ROOT / "data"
     modules_dir: Path = PROJECT_ROOT / "modules"
     logs_dir: Path = PROJECT_ROOT / "logs"
+    down_dir: Path = PROJECT_ROOT / "down"
     frontend_dir: Path = PROJECT_ROOT / "frontend" / "dist"
     database_url: str | None = None
 
@@ -104,22 +105,28 @@ class Settings(BaseSettings):
         self.data_dir = self.data_dir.expanduser().resolve()
         self.modules_dir = self.modules_dir.expanduser().resolve()
         self.logs_dir = self.logs_dir.expanduser().resolve()
+        self.down_dir = self.down_dir.expanduser().resolve()
         self.frontend_dir = self.frontend_dir.expanduser().resolve()
 
         for directory in (
             self.data_dir,
             self.modules_dir,
             self.logs_dir,
+            self.down_dir,
             self.logs_dir / "executions",
         ):
             directory.mkdir(parents=True, exist_ok=True)
 
         # Sensitive runtime state must not be world-readable on a shared host.
-        for private_dir in (self.data_dir, self.logs_dir):
+        for private_dir in (self.data_dir, self.logs_dir, self.down_dir):
             try:
                 private_dir.chmod(0o700)
             except OSError:  # pragma: no cover - non-POSIX filesystems
                 pass
+
+        # Modules run in-process and discover the shared download directory via
+        # this environment variable; always expose the resolved absolute path.
+        os.environ["DOWN_DIR"] = str(self.down_dir)
 
         if self.secret_key and self.secret_key.strip():
             self.secret_key = self.secret_key.strip()

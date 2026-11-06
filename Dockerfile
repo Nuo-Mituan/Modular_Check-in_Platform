@@ -30,6 +30,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DATA_DIR=/app/data \
     MODULES_DIR=/app/modules \
     LOGS_DIR=/app/logs \
+    DOWN_DIR=/app/down \
     FRONTEND_DIR=/app/static
 
 WORKDIR /app
@@ -47,10 +48,9 @@ COPY modules ./modules
 COPY templates ./templates
 COPY docker-entrypoint.py /usr/local/bin/docker-entrypoint.py
 
-RUN mkdir -p /app/data /app/logs /app/down /app/modules /app/app/push_drivers/custom \
-    && chmod 700 /app/data /app/logs \
+RUN mkdir -p /app/data /app/logs /app/modules /app/down /app/app/push_drivers/custom \
+    && chmod 700 /app/data /app/logs /app/down \
     && chmod 755 /usr/local/bin/docker-entrypoint.py \
-    && chmod 770 /app/down \
     && chmod -R a+rX /app/app /app/static /app/templates /app/modules
 
 EXPOSE 5000

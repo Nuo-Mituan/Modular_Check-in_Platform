@@ -63,6 +63,8 @@
 - **多源模块图标**：支持 Emoji、本地 PNG/JPG/WebP/ICO、Base64 Data URI、HTTPS URL；本地栅格图标自动转 RGBA PNG 保留透明通道，非法或加载失败统一降级为 ⚠️。
 - **模块热插拔**：上传 ZIP 或把模块目录放进 `modules/` 后点击扫描，无需重启服务；
   支持 `directory_name` 物理目录名与 `legacy_key` 目录迁移，API key 与磁盘目录解耦。
+- **下载模块共享目录**：平台提供 `/app/down`（本地 `down/`），按 `PUID` 权限读写并挂载持久化 volume；
+  模块使用 `DOWN_DIR/<module_key>/` 保存下载文件。
 - **自动渲染参数表单**：模块通过 `config.json` 声明 `text / textarea / password / select / switch / number` 参数。
 - **参数加密存储**：AES-256-GCM v2（HKDF-SHA256 派生密钥、AAD 绑定模块/账号），旧 Fernet 密文透明升级。
 - **随机时间调度**：为每个模块设置 `HH:mm` 时间窗与每日 / 每周 / 每月15日 / 每月 / 每年周期；
@@ -85,7 +87,7 @@
 - **系统运维**：系统日志、日志保留设置、推送历史/批次、诊断指标 `/api/system/metrics` 与
   Prometheus `/metrics`；支持运行中查看调度器状态。
 - **Docker 一键部署**：多阶段构建，前端与后端打包进同一个轻量镜像；入口脚本按 `PUID`/`PGID`
-  修复挂载目录权限后降权运行，`data/`、`logs/` 使用 700 权限，数据通过 volume 持久化。
+  修复挂载目录权限后降权运行，`data/`、`logs/`、`down/` 使用 700 权限，数据通过 volume 持久化。
 - **内置示例模块**：两个不访问真实接口的演示模块，覆盖所有参数类型与相对导入。
 - **进阶模块模板**：多账号标准入口，演示 Cookie 过期检测、自动刷新、退避重试与平台推送接入。
 - **部署验证脚本**：一条命令在隔离环境中验证 Docker 构建、启动、随机调度、多账号、推送配置与核心 API。
@@ -106,9 +108,9 @@
 ```bash
 cd modular-check-in-platform
 
-mkdir -p data logs modules
+mkdir -p data logs modules down
 cp .env.example .env        # 可选：修改端口；ADMIN_PASS 留空则自动生成随机密码
-# PUID/PGID 默认 10001；入口脚本会 chown data/logs/modules 后降权
+# PUID/PGID 默认 10001；入口脚本会 chown data/logs/modules/down 后降权
 ```
 
 ### 2. 构建并启动
@@ -174,7 +176,7 @@ chmod +x verify_docker.sh
 脚本会：
 
 1. 使用独立的 Compose 项目名、容器名、镜像名和随机端口；
-2. 在临时目录中复制示例模块，不修改你的 `data/`、`logs/`、`modules/`；
+2. 在临时目录中复制示例模块，不修改你的 `data/`、`logs/`、`modules/`、`down/`；
 3. 执行 `docker compose build` 并启动容器；
 4. 调用 `/api/health`；
 5. 使用随机管理员密码登录，验证未认证隔离、用户名/密码、随机时间与五种周期、
@@ -283,6 +285,7 @@ modular-check-in-platform/
 │       ├── config.json
 │       ├── main.py
 │       └── utils.py
+├── down/                            # 下载模块共享目录（运行时内容不入库）
 ├── templates/
 │   └── advanced_checkin/           # 进阶模板：多账号入口、Cookie 刷新、重试
 │       ├── config.json
@@ -317,6 +320,7 @@ data/checkin.db          # SQLite 数据库
 data/.secret_key         # 自动生成的密钥（未配置 SECRET_KEY 时）
 modules/<directory_name>/ # 模块物理目录；未设置时回退为 API key
 logs/executions/<key>/    # 执行日志文件镜像，按 API key 分组
+down/<module_key>/        # 下载模块共享目录（带下载功能的模块使用）
 ```
 
 ---
@@ -663,6 +667,8 @@ async def run(params: dict[str, Any]) -> dict[str, Any]:
 | `DATA_DIR` | `./data` | 数据库与密钥目录；容器内为 `/app/data`。 |
 | `MODULES_DIR` | `./modules` | 模块目录；容器内为 `/app/modules`。 |
 | `LOGS_DIR` | `./logs` | 文件日志/旧日志目录；容器内为 `/app/logs`。 |
+| `DOWN_DIR` | `./down` | 下载模块共享目录；容器内为 `/app/down`。 |
+| `DOWN_DIR_HOST` | `./down` | Compose 挂载到 `/app/down` 的宿主机路径。 |
 | `FRONTEND_DIR` | `./frontend/dist` | 前端构建产物目录；容器内为 `/app/static`。 |
 | `DATABASE_URL` | SQLite | 可选的自定义数据库 URL（需安装对应异步驱动）。 |
 | `CORS_ORIGINS` | 空 | 逗号分隔的额外允许来源，同源部署不需要配置。 |
@@ -694,7 +700,7 @@ pip install -r backend/requirements-dev.txt
 uvicorn app.main:app --app-dir backend --reload --port 5000
 ```
 
-默认使用项目根目录下的 `data/`、`modules/`、`logs/`，并托管 `frontend/dist/`。
+默认使用项目根目录下的 `data/`、`modules/`、`logs/`、`down/`，并托管 `frontend/dist/`。
 未构建前端时访问 `/` 会返回提示 JSON，但 API 与 `/docs` 仍可用。
 
 ### 前端（Node.js 20+）
@@ -785,7 +791,7 @@ cd frontend && npm run build            # 生产构建验证
 - [ ] SSE 路径关闭代理缓冲（否则实时日志会被延迟）
 - [ ] 合理设置 `LOG_RETENTION_DAYS` 并监控磁盘
 - [ ] 只安装可信模块与自定义推送驱动（代码以服务进程权限执行，非沙箱）
-- [ ] 确认 `PUID` / `PGID` 与宿主机挂载目录权限匹配，`data/`、`logs/` 为 700
+- [ ] 确认 `PUID` / `PGID` 与宿主机挂载目录权限匹配，`data/`、`logs/`、`down/` 为 700
 - [ ] 若公网部署，限制 `/metrics` 抓取来源并关闭不必要的诊断权限
 - [ ] 为环形日志设置合理保留天数与条数/字节上限
 - [ ] 实际演练一次备份恢复
@@ -811,12 +817,14 @@ docker compose stop
 mkdir -p backups
 umask 077
 FILES=(data modules logs)
+# 如需保留下载文件，取消下一行注释：
+# FILES+=(down)
 [[ -f .env ]] && FILES+=(.env)
 tar -czf "backups/checkin-$(date +%Y%m%d-%H%M%S).tar.gz" "${FILES[@]}"
 docker compose start
 ```
 
-`data/`（包含数据库与 `.secret_key`）、`modules/` 与 `.env` 是最关键的内容。
+`data/`（包含数据库与 `.secret_key`）、`modules/`、`down/`（如需要保留下载文件）与 `.env` 是最关键的内容。
 升级前请务必先备份，并保留一份升级前的代码 / commit。
 
 ### 升级
@@ -955,7 +963,7 @@ docker compose up -d
 - 推送重构：内置 + 自定义驱动、驱动热加载/回滚/版本管理、独立推送与统一批次、推送记录/批次摘要、超时兜底。
 - 开发者模式：服务端强制校验，支持隔离的测试执行。
 - 系统日志、日志设置、运行时指标 `/api/system/metrics` 与 Prometheus `/metrics`。
-- Docker 非 root 入口：`PUID`/`PGID` 降权，`data/`/`logs/` 700，SQLite 600。
+- Docker 非 root 入口：`PUID`/`PGID` 降权，`data/`/`logs/`/`down/` 700，SQLite 600。
 - 模块图标系统：Emoji、本地 PNG/JPG/WebP/ICO、Base64、HTTPS URL；栅格图标转 RGBA PNG，路径沙箱/尺寸/Magic Bytes 限制。
 - 模块物理目录名 `directory_name` 与 `legacy_key` 迁移；图标、执行与删除均按物理目录读取。
 - 当前测试矩阵：221 个默认测试、5 个 PBT 契约测试、3 个基准测试；前端生产构建通过。

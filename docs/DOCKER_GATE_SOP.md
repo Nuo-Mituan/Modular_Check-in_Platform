@@ -41,7 +41,7 @@ CSRF_ENABLED=true
 
 ```bash
 chmod 600 .env
-mkdir -p data logs
+mkdir -p data logs down
 cp -a data data.backup.$(date +%Y%m%d%H%M%S)
 ```
 
@@ -58,7 +58,7 @@ docker compose build --no-cache
 - `backend/tests`；
 - `requirements-dev.txt` / pytest；
 - `templates`、`modules`；
-- `/app/data`、`/app/logs`。
+- `/app/data`、`/app/logs`、`/app/down`。
 
 ## 4. 容器内全量技术债回归
 
@@ -67,6 +67,7 @@ docker compose up -d
 docker compose exec -T \
   -e DATA_DIR=/tmp/rc2-tests/data \
   -e LOGS_DIR=/tmp/rc2-tests/logs \
+  -e DOWN_DIR=/tmp/rc2-tests/down \
   -e SECRET_KEY=rc2-container-test \
   -e ADMIN_USER=admin \
   -e ADMIN_PASS=admin123 \
@@ -83,13 +84,13 @@ docker compose exec -T \
 ```bash
 docker compose exec -T checkin-platform \
   awk '/^Uid:/{print $2}' /proc/1/status
-docker compose exec -T checkin-platform stat -c '%a %n' /app/data /app/logs /app/data/checkin.db
+docker compose exec -T checkin-platform stat -c '%a %n' /app/data /app/logs /app/down /app/data/checkin.db
 ```
 
 判定：
 
 - 主进程 UID = `.env` 中 `PUID`，且 **非 0**；
-- `/app/data`、`/app/logs` = `700`；
+- `/app/data`、`/app/logs`、`/app/down` = `700`；
 - `checkin.db` = `600`。
 
 ## 6. 执行完整或临时门禁

@@ -1,8 +1,8 @@
 # 备份、恢复与迁移指南
 
 本文适用于使用仓库默认 `docker-compose.yml`（bind mount）的部署方式。
-如果你修改过 `DATA_DIR_HOST`、`MODULES_DIR_HOST`、`LOGS_DIR_HOST`，请用实际宿主机路径替换下文中的
-`data/`、`modules/`、`logs/`。
+如果你修改过 `DATA_DIR_HOST`、`MODULES_DIR_HOST`、`LOGS_DIR_HOST`、`DOWN_DIR_HOST`，请用实际宿主机路径替换下文中的
+`data/`、`modules/`、`logs/`、`down/`。
 
 > 相关文档：[生产安全检查清单](PRODUCTION_SECURITY.md)、[部署说明](../README.md)
 
@@ -17,6 +17,7 @@
 | `.env` | **强烈建议** | 管理员初始化配置、显式 `SECRET_KEY`、端口、时区、日志策略等。 |
 | `modules/` | **必需** | 所有已安装模块的源码、`config.json`、辅助文件。 |
 | `logs/` | 可选 | 执行日志的文件镜像；主要日志也保存在数据库中。 |
+| `down/` | 可选 | 带下载功能的模块保存的下载文件；通常体积较大，可按需备份。 |
 | `frontend/dist/` | 否 | 可重新构建，不需要备份。 |
 | Docker 镜像 | 否 | 可通过源码重新构建；建议记录版本 / commit。 |
 
@@ -43,6 +44,8 @@ docker compose stop
 
 ARCHIVE="backups/checkin-$(date +%Y%m%d-%H%M%S).tar.gz"
 FILES=(data modules logs)
+# 如需保留模块下载文件，取消下一行注释：
+# FILES+=(down)
 [[ -f .env ]] && FILES+=(.env)
 [[ -f data/.secret_key ]] && echo "包含自动生成的 .secret_key"
 
@@ -121,7 +124,7 @@ git clone <你的仓库地址> /opt/modular-checkin-platform
 # 或者拷贝与备份时相同版本的项目源码
 
 cd /opt/modular-checkin-platform
-mkdir -p data modules logs
+mkdir -p data modules logs down
 ```
 
 如果旧服务器使用自动生成的 `data/.secret_key`，恢复时**必须保持它不变**。
@@ -218,6 +221,7 @@ docker compose stop
 mkdir -p backups
 UPGRADE_ARCHIVE="backups/pre-upgrade-$(date +%Y%m%d-%H%M%S).tar.gz"
 BACKUP_ITEMS=(data modules logs)
+# 如需保留模块下载文件：BACKUP_ITEMS+=(down)
 [[ -f .env ]] && BACKUP_ITEMS+=(.env)
 tar -czf "$UPGRADE_ARCHIVE" "${BACKUP_ITEMS[@]}"
 echo "已备份到 $UPGRADE_ARCHIVE"
@@ -245,6 +249,7 @@ docker compose logs --tail=100 checkin-platform
 | `.env` | **保留原文件**，仅按新版 `.env.example` 补充新增配置。 |
 | `data/.secret_key` | **绝不替换**，否则参数无法解密。 |
 | `logs/` | 可保留。新版本不会依赖旧文件日志。 |
+| `down/` | 可保留。模块下载文件与数据库恢复无关，按需迁移。 |
 
 可以安全替换 / 更新的内容：
 

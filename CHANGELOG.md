@@ -50,6 +50,7 @@
 - [BREAKING] Removed the internal `is_new` parameter from `_module_field_values`; create/update both use `_module_field_values(config)` and set `directory_name` explicitly at the create call site. This internal helper has no external callers.
 
 ### Added
+- Added `/app/down` (`DOWN_DIR`) shared download directory for download-capable modules, with 700 permissions, a persistent Compose volume (`DOWN_DIR_HOST`), and a resolved absolute path exposed via `DOWN_DIR`.
 - Created pbt_bootstrap.py CLI tool for standardized PBT contract scaffolding
 - Released State Machine Refactoring Playbook v2.0 with integration hardening patterns from R54-R55
 - Published team enablement materials for State Machine Refactoring Playbook

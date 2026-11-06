@@ -58,7 +58,7 @@ Docker Compose（单容器）
 - [ ] `SECRET_KEY` 显式设置或确认 `data/.secret_key` 已生成且纳入备份；
 - [ ] `.env` 权限 `600`，不提交 Git；
 - [ ] `APP_BIND` 限定为 `127.0.0.1` 或可信局域网 IP；
-- [ ] 容器以 `PUID/PGID` 非 root 运行，`data/`、`logs/` 权限 `700`；
+- [ ] 容器以 `PUID/PGID` 非 root 运行，`data/`、`logs/`、`down/` 权限 `700`；
 - [ ] SQLite 文件权限 `600`（应用自动设置）；
 - [ ] 只安装信任的模块和推送驱动；
 - [ ] 运行 `python scripts/verify_api.py` 与 `bash verify_docker.sh`；
@@ -115,7 +115,7 @@ Docker Compose（单容器）
 - 默认 `PUID=PGID=10001`；
 - 宿主机 bind mount 可能被 chown，请提前确认；
 - 建议 `no-new-privileges: true`；
-- 容器内 `/app/data`、`/app/logs` 应为 `700`，SQLite 为 `600`。
+- 容器内 `/app/data`、`/app/logs`、`/app/down` 应为 `700`，SQLite 为 `600`。
 
 ## 10. 数据备份与日志清理
 
@@ -142,7 +142,7 @@ cp data/.secret_key backup.secret_key
 - [ ] `COOKIE_SECURE` 与部署协议一致；
 - [ ] CSRF 未关闭；
 - [ ] 容器 UID 非 0；
-- [ ] data/logs 权限 700，DB 600；
+- [ ] data/logs/down 权限 700，DB 600；
 - [ ] 备份可用；
 - [ ] 只安装可信模块/驱动；
 - [ ] 日志保留策略符合磁盘容量；
