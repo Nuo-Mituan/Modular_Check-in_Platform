@@ -30,7 +30,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DATA_DIR=/app/data \
     MODULES_DIR=/app/modules \
     LOGS_DIR=/app/logs \
-    DOWN_DIR=/app/down \
     FRONTEND_DIR=/app/static
 
 WORKDIR /app
@@ -45,13 +44,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/app ./app
 COPY --from=frontend-builder /web/dist ./static
 COPY modules ./modules
-COPY templates ./templates
 COPY docker-entrypoint.py /usr/local/bin/docker-entrypoint.py
 
-RUN mkdir -p /app/data /app/logs /app/modules /app/down /app/app/push_drivers/custom \
-    && chmod 700 /app/data /app/logs /app/down \
+# Production image intentionally excludes templates/ and scripts/ (source/test assets).
+RUN mkdir -p /app/data /app/logs /app/modules /app/app/push_drivers/custom \
+    && chmod 700 /app/data /app/logs \
     && chmod 755 /usr/local/bin/docker-entrypoint.py \
-    && chmod -R a+rX /app/app /app/static /app/templates /app/modules
+    && chmod -R a+rX /app/app /app/static /app/modules
 
 EXPOSE 5000
 
