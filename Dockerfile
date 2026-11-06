@@ -47,9 +47,10 @@ COPY modules ./modules
 COPY templates ./templates
 COPY docker-entrypoint.py /usr/local/bin/docker-entrypoint.py
 
-RUN mkdir -p /app/data /app/logs /app/modules /app/app/push_drivers/custom \
+RUN mkdir -p /app/data /app/logs /app/down /app/modules /app/app/push_drivers/custom \
     && chmod 700 /app/data /app/logs \
     && chmod 755 /usr/local/bin/docker-entrypoint.py \
+    && chmod 755 /app/down \
     && chmod -R a+rX /app/app /app/static /app/templates /app/modules
 
 EXPOSE 5000
