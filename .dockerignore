@@ -41,7 +41,8 @@ docker-compose*.yml
 your-excluded-folder/
 secret-config.json
 .env.local
-modules/
+modules/demo_checkin/
+modules/moyu_energy/
 down/
 backend/observability/
 pyproject.toml
