@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--release-dir", type=Path, required=True)
