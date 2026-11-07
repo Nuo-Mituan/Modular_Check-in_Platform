@@ -39,9 +39,5 @@
     "payload_checksum",
     "payload_file_count",
     "checklist"
-  ],
-  "release_excluded_dirs": [
-    "modules",
-    "down"
   ]
 }
