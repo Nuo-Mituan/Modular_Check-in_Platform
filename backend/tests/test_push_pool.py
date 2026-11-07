@@ -891,6 +891,10 @@ async def test_cross_day_pending_batches_are_terminalized() -> None:
 
     await init_db()
     await _disable_pool_modules()
+    from sqlalchemy import delete
+    async with SessionLocal() as db:
+        await db.execute(delete(PushBatch))
+        await db.commit()
     today = datetime.now(settings.timezone_info).date()
     skip_cycle = (today - timedelta(days=2)).isoformat()
     active_cycle = (today - timedelta(days=1)).isoformat()
