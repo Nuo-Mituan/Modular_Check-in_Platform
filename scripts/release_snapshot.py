@@ -19,7 +19,7 @@ EXCLUDED_DIRS = {
     ".git", "Releases", "node_modules", ".venv", "__pycache__",
     ".pnpm-store", ".hypothesis", ".pytest_cache", ".mypy_cache",
     "dist", "tests", "data", "logs", "release", ".ruff_cache", ".github",
-    "backups", "tools", "modules", "down",
+    "backups", "tools",
 }
 EXCLUDED_FILES = {
     ".env", ".DS_Store", "代码审查指令.txt", "对外干净发布指令.txt",
