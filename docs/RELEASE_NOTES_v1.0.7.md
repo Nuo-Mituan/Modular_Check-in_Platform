@@ -67,6 +67,15 @@
 **修复路径**：重新导出合规 data URI/图标并上传。
 **回退**：回退 `validate_data_uri` 与加载侧 fallback；原值未改。
 
+## 发布包目录说明
+
+自 v1.0.7 起，Release 发布包（payload）不再重复打包 `modules/` 与 `down/` 目录。
+
+- GitHub 源码仓库已包含这两个目录及其固定说明文件，发布包中无需冗余包含；
+- Docker 镜像基于源码仓库构建，仍自然包含完整的 `modules/` 与 `down/` 目录；
+- 已有部署升级时，运行环境中的 `modules/` 与 `down/` 不会被覆盖或删除；
+- 个人自定义模块应自行备份；发布包不包含用户运行环境中的模块数据。
+
 ## 工程与发布链路
 
 - **TD-18**：新增 `.importlinter` 分层合同与 CI job；3 contracts kept、0 broken。
