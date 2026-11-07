@@ -20,4 +20,28 @@
     "yarn.lock"
   ],
   "openapi_paths_max": 41,
+  "version_endpoint_required_fields": [
+    "version",
+    "build_time",
+    "git_commit",
+    "min_supported_client",
+    "recommended",
+    "release_notes_url",
+    "payload_checksum",
+    "payload_bytes",
+    "environment"
+  ],
+  "manifest_required_fields": [
+    "version",
+    "generated_at",
+    "git_commit",
+    "files",
+    "payload_checksum",
+    "payload_file_count",
+    "checklist"
+  ],
+  "release_excluded_dirs": [
+    "modules",
+    "down"
+  ]
 }

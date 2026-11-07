@@ -19,7 +19,7 @@ EXCLUDED_DIRS = {
     ".git", "Releases", "node_modules", ".venv", "__pycache__",
     ".pnpm-store", ".hypothesis", ".pytest_cache", ".mypy_cache",
     "dist", "tests", "data", "logs", "release", ".ruff_cache", ".github",
-    "backups", "tools",
+    "backups", "tools", "modules", "down",
 }
 EXCLUDED_FILES = {
     ".env", ".DS_Store", "代码审查指令.txt", "对外干净发布指令.txt",
@@ -151,7 +151,7 @@ def main() -> int:
         checklist_path = args.checklist_json.resolve()
         result = subprocess.run([
             os.sys.executable, str(ROOT / "scripts" / "release_checklist.py"),
-            "--release-dir", str(target), "--json", str(checklist_path),
+            "--release-dir", str(target), "--json", str(checklist_path), "--phase", "pre",
         ], check=False)
         if result.returncode != 0:
             for name in ("MANIFEST.json", "MANIFEST.sha256"):
@@ -193,7 +193,7 @@ def main() -> int:
         "release_notes": "RELEASE_NOTES.md",
         "payload_file_count": len(files) + len(dist_files) + 1 + 2,
         "payload_bytes": sum((target / rel).stat().st_size for rel in (files + dist_files)),
-        "expected_sha256_ok": len(files) + len(dist_files) + 1 + 2 - 1,
+        "expected_sha256_ok": len(included) + 1,
         "files": {str(rel): _sha256(target / rel) for rel in included},
         "excluded": {
             "directories": sorted(EXCLUDED_DIRS),
