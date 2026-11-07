@@ -111,6 +111,12 @@
   必要时用顶层 overrides 并记录 provenance。
 - minimatch 已 pin `11.0.1`；每次上游修复后需手动复核 overrides。
 
+## TD-32b 记录
+
+- 2026-11-07：TD-32b 完成；`release_checklist.py` full phase 23/23 pass，
+  `release_upload_checklist.sh` 已降为 20 行包装器；snapshot 在 80d2020 生成，
+  payload 排除 `modules/` 与 `down/`。TD-32 作为 v1.0.8 工程项不再阻塞发布。
+
 ## TD-32a 记录
 
 - 2026-11-01：`release_baseline.json` 新增 `version_endpoint_required_fields` 与
