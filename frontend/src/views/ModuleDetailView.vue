@@ -68,7 +68,7 @@
             <el-switch
               :model-value="module.enabled"
               :loading="toggleLoading"
-              :disabled="Boolean(module.load_error) || (param.key === 'chrome_version' && chromeSyncEnabled)"
+              :disabled="Boolean(module.load_error)"
               :before-change="toggleEnabled"
             />
           </div>
@@ -181,7 +181,7 @@
                     <ParamField
                       v-model="params[param.key]"
                       :param="param"
-                      :disabled="Boolean(module.load_error)"
+                      :disabled="Boolean(module.load_error) || (param.key === 'chrome_version' && chromeSyncEnabled)"
                     />
                     <div v-if="param.help" class="param-help">
                       <el-icon><InfoFilled /></el-icon>{{ param.help }}
