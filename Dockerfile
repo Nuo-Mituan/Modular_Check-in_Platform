@@ -50,7 +50,7 @@ COPY docker-entrypoint.py /usr/local/bin/docker-entrypoint.py
 RUN mkdir -p /app/data /app/logs /app/modules /app/down /app/app/push_drivers/custom \
     && chmod 700 /app/data /app/logs /app/down \
     && chmod 755 /usr/local/bin/docker-entrypoint.py \
-    && chmod -R a+rX /app/app /app/static /app/templates /app/modules
+    && chmod -R a+rX /app/app /app/static /app/modules
 
 EXPOSE 5000
 
