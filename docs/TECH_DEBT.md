@@ -1,4 +1,4 @@
-# 技术债登记（v1.0.7 迭代）
+# 技术债登记（v1.0.8 迭代）
 
 > 本文件记录已确认但不在封版前修复的 P2/P3 问题。
 > **计数口径（2026-11-01 起）**：总数 = 已完成 + 待清零 + 已关闭（不实施）。
@@ -16,7 +16,7 @@
 > **Batch 3 状态（2026-10-20）**：TD-06 / TD-13 / TD-14 / TD-16 / TD-20 已完成。
 > 环形日志改为单写线程 + 有界队列；SSE 指标/重连滞后可查询；心跳可配置；新增只读系统日志页。
 
-### 已完成（30）
+### 已完成（31）
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -48,17 +48,15 @@
 | ✅ | TD-18 | P3 | 全项目 | 未接入 import-linter / mypy / ruff CI | 回归依赖人工 | CI 增加 import-linter、mypy（渐进）、ruff | 平台维护者 |
 | ✅ | TD-26 | P3 | `backend/app/services/push_delivery.py` / `bootstrap.py` | 全量 mypy 9 个既有错误 | 门禁例外长期存在 | 逐个修复并恢复全量 mypy 门禁 | 平台维护者 |
 | ✅ | TD-31 | P3 | `scripts/release_upload_checklist.sh` | checklist 的 Python 断言块失败时未统一输出 `FAIL:` 前缀 | 自动化日志可读性不足 | 统一断言失败前缀，归 v1.0.7 | 发布负责人 |
-
 | ✅ | TD-33 | P3 | `backend/app/core/metrics.py` | import-linter 的 2 条 metrics 懒加载例外长期存在 | 门禁存在永久例外 | 抽离 provider 注册表到 core，移除 ignore_imports | 平台维护者 |
+| ✅ | TD-23b | P1 | Releases/CI | release checklist --json + snapshot 前置 gate | 清单未机器化，manifest 无法证明 gate 已通过 | checklist 输出 JSON；snapshot 在 gate 通过后生成 manifest；provenance 写入 MANIFEST | 发布负责人 |
+| ✅ | TD-34 | P3 | `frontend/package-lock.json` / CI | npm audit 剩余 3 个 moderate（glob/js-beautify/editorconfig）；CI 未设 audit gate | 未来若把 audit 设为闸门会突然变红 | 先登记 known moderate；优先升级上游，必要时 overrides 并留 provenance | 前端维护者 |
 
-### 待清零（2）
+### 待清零（1）
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| ✅ | TD-23b | P1 | Releases/CI | release checklist --json + snapshot 前置 gate | 清单未机器化，manifest 无法证明 gate 已通过 | checklist 输出 JSON；snapshot 在 gate 通过后生成 manifest；provenance 写入 MANIFEST | 发布负责人 |
 | ⬜ | TD-19 | P3 | `services/execution.py` | 旧 `execution_logs.output` 字段保留 | 数据模型有历史包袱 | 下个大版本迁移后移除 | 平台维护者 |
-
-| ⬜ | TD-34 | P3 | `frontend/package-lock.json` / CI | npm audit 剩余 3 个 moderate（glob/js-beautify/editorconfig）；CI 未设 audit gate | 未来若把 audit 设为闸门会突然变红 | 先登记 known moderate；优先升级上游，必要时 overrides 并留 provenance | 前端维护者 |
 
 ### 已关闭（2）
 
@@ -72,7 +70,7 @@
 
 ### v1.0.7 技术债核对结论（2026-11-01）
 
-- 已完成：**30 项**；待清零：**2 项**；已关闭：**2 项**（总数 34）。
+- 已完成：**31 项**；待清零：**1 项**；已关闭：**2 项**（总数 34）。
 - 差异说明：`TECH_DEBT_CLEARANCE_PLAN.md` 记录 RC6-TD-01~20 已全部清零，但本次核对确认
   TD-18（CI 缺 import-linter）与 TD-19（`backend/app/models.py` 仍保留废弃的
   `execution_logs.output` 字段）不标为已完成。
@@ -103,6 +101,18 @@
   TD-25 随同入库转正。
 - TD-32（待登记，不计入当前 32 项口径）：`release_baseline.json` 按域拆分为
   pytest/openapi/mypy/lockfile 多文件，避免再次跨主题冲突。
+
+## TD-19 阻塞说明
+
+- TD-19b（回填 `execution_logs.output` 到 `ring_logs`、SQLite/PostgreSQL 删列）
+  需要独立迁移窗口、备份/回滚验证与双数据库测试；当前工作区无法安全执行破坏性迁移。
+  保持 ⬜，不计入 v1.0.8 完成数。
+
+## TD-34 完成记录
+
+- 2026-11-08：`glob` override 到 `14.0.4`，保留 minimatch `11.0.1`；
+  `npm audit` 归零（0 vulnerabilities）；前端 42 项测试与 `vite build` 通过。
+  TD-34 转正为 ✅。
 
 ## TD-34 记录
 
@@ -238,8 +248,8 @@ v1.0.7 第一周必须完成以下评估并给出排期：
 ## 自检数据
 
 ```text
-已完成标记数：30
-待清零标记数：2
+已完成标记数：31
+待清零标记数：1
 修改文件：docs/TECH_DEBT.md
 未修改：任何源码、测试、Releases/v1.0.6/
 ```

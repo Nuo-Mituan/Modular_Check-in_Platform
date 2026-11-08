@@ -20,7 +20,7 @@ FROM python:3.11-slim AS runtime
 
 LABEL org.opencontainers.image.title="Modular Check-in Platform" \
       org.opencontainers.image.description="Self-hosted daily check-in platform with hot-pluggable modules" \
-      org.opencontainers.image.version="1.0.7"
+      org.opencontainers.image.version="1.0.8"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -30,6 +30,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DATA_DIR=/app/data \
     MODULES_DIR=/app/modules \
     LOGS_DIR=/app/logs \
+    DOWN_DIR=/app/down \
     FRONTEND_DIR=/app/static
 
 WORKDIR /app
@@ -44,13 +45,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/app ./app
 COPY --from=frontend-builder /web/dist ./static
 COPY modules ./modules
+COPY templates ./templates
 COPY docker-entrypoint.py /usr/local/bin/docker-entrypoint.py
 
-# Production image intentionally excludes templates/ and scripts/ (source/test assets).
-RUN mkdir -p /app/data /app/logs /app/modules /app/app/push_drivers/custom \
-    && chmod 700 /app/data /app/logs \
+RUN mkdir -p /app/data /app/logs /app/modules /app/down /app/app/push_drivers/custom \
+    && chmod 700 /app/data /app/logs /app/down \
     && chmod 755 /usr/local/bin/docker-entrypoint.py \
-    && chmod -R a+rX /app/app /app/static /app/modules
+    && chmod -R a+rX /app/app /app/static /app/templates /app/modules
 
 EXPOSE 5000
 

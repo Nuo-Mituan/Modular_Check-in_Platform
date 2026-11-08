@@ -155,6 +155,74 @@
         "title": "ChangePasswordRequest",
         "type": "object"
       },
+      "ChromeSettingsOut": {
+        "properties": {
+          "chrome_major_version": {
+            "title": "Chrome Major Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chrome_major_version"
+        ],
+        "title": "ChromeSettingsOut",
+        "type": "object"
+      },
+      "ChromeSettingsUpdate": {
+        "properties": {
+          "chrome_major_version": {
+            "title": "Chrome Major Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chrome_major_version"
+        ],
+        "title": "ChromeSettingsUpdate",
+        "type": "object"
+      },
+      "ChromeSyncOut": {
+        "properties": {
+          "chrome_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chrome Version"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "supported",
+          "enabled"
+        ],
+        "title": "ChromeSyncOut",
+        "type": "object"
+      },
+      "ChromeSyncUpdate": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "ChromeSyncUpdate",
+        "type": "object"
+      },
       "DashboardOut": {
         "properties": {
           "recent": {
@@ -2659,7 +2727,7 @@
   "info": {
     "description": "每日自动签到平台：模块热插拔、多账号串行、随机时间调度与实时日志。",
     "title": "签到云台 API",
-    "version": "1.0.7"
+    "version": "1.0.8"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3667,6 +3735,108 @@
         ]
       }
     },
+    "/api/modules/{module_id}/chrome-sync": {
+      "get": {
+        "operationId": "get_chrome_sync_api_modules__module_id__chrome_sync_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "module_id",
+            "required": true,
+            "schema": {
+              "title": "Module Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChromeSyncOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "读取模块 Chrome 同步状态",
+        "tags": [
+          "签到模块"
+        ]
+      },
+      "put": {
+        "operationId": "update_chrome_sync_api_modules__module_id__chrome_sync_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "module_id",
+            "required": true,
+            "schema": {
+              "title": "Module Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChromeSyncUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChromeSyncOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "设置模块 Chrome 同步开关",
+        "tags": [
+          "签到模块"
+        ]
+      }
+    },
     "/api/modules/{module_id}/enabled": {
       "patch": {
         "operationId": "toggle_module_api_modules__module_id__enabled_patch",
@@ -4533,6 +4703,76 @@
         "summary": "保存统一推送兜底设置",
         "tags": [
           "推送通知"
+        ]
+      }
+    },
+    "/api/settings/chrome": {
+      "get": {
+        "operationId": "get_chrome_settings_api_settings_chrome_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChromeSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "读取全局 Chrome 版本",
+        "tags": [
+          "系统"
+        ]
+      },
+      "put": {
+        "operationId": "update_chrome_settings_api_settings_chrome_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChromeSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChromeSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "保存全局 Chrome 版本",
+        "tags": [
+          "系统"
         ]
       }
     },

@@ -130,14 +130,20 @@ async def test_td09_all_skip_batch_terminates_without_api_call() -> None:
     from sqlalchemy import func, select, update
 
     from app.database import SessionLocal, init_db
-    from app.models import Module, PushBatch, PushPool
+    from app.models import Module, PushBatch, PushOutbox, PushPool
     from app.services import push_pool
 
     await init_db()
     async with SessionLocal() as db:
+        from sqlalchemy import delete
         await db.execute(
             update(Module).values(enabled=False, push_unified=False)
         )
+        cycle = "2026-11-08"  # Sunday, weekly Monday => all skip
+        await db.execute(delete(PushPool).where(PushPool.cycle_id == cycle))
+        await db.execute(delete(PushBatch).where(PushBatch.cycle_id == cycle))
+        await db.execute(delete(PushOutbox))
+        await db.execute(delete(Module).where(Module.key == "td09-all-skip"))
         module = Module(
             key="td09-all-skip",
             name="TD09",
@@ -160,7 +166,6 @@ async def test_td09_all_skip_batch_terminates_without_api_call() -> None:
         )
         db.add(module)
         await db.commit()
-    cycle = "2026-11-08"  # Sunday, weekly Monday => all skip
     await push_pool.ensure_batch(cycle)
     assert await push_pool.maybe_flush_batch(cycle) is False
     async with SessionLocal() as db:
@@ -395,3 +400,44 @@ async def test_td08_outbox_stays_pending_when_ring_write_fails(monkeypatch) -> N
         assert row is not None
         assert row.status == "pending"
         assert row.attempts >= 1
+
+
+@pytest.mark.asyncio
+async def test_td19a_finalize_does_not_write_output(monkeypatch) -> None:
+    from app.models import ExecutionLog
+    from app.services.execution import _finalize
+    from app.database import SessionLocal, init_db
+
+    await init_db()
+    async with SessionLocal() as db:
+        row = ExecutionLog(module_id=1, module_key="td19a", module_name="td19a", status="running")
+        db.add(row)
+        await db.commit()
+        log_id = row.id
+    from datetime import datetime, timezone
+
+    await _finalize(log_id, 1, "success", "ok", "legacy-output", datetime.now(timezone.utc), 1)
+    async with SessionLocal() as db:
+        row = await db.get(ExecutionLog, log_id)
+        assert row is not None
+        assert row.output is None
+        assert "日志存储失败" in (row.message or "")
+
+
+@pytest.mark.asyncio
+async def test_td19a_legacy_output_is_still_readable_as_fallback() -> None:
+    from app.database import SessionLocal, init_db
+    from app.models import ExecutionLog
+    from app.routers.logs import _load_snapshot
+
+    await init_db()
+    async with SessionLocal() as db:
+        row = ExecutionLog(
+            module_id=1, module_key="td19a-legacy", module_name="td19a-legacy",
+            status="success", output="legacy-only-output",
+        )
+        db.add(row)
+        await db.commit()
+        log_id = row.id
+    snapshot = await _load_snapshot(log_id)
+    assert snapshot.legacy_output == "legacy-only-output"
