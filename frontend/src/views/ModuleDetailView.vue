@@ -68,7 +68,7 @@
             <el-switch
               :model-value="module.enabled"
               :loading="toggleLoading"
-              :disabled="Boolean(module.load_error)"
+              :disabled="Boolean(module.load_error) || (param.key === 'chrome_version' && chromeSyncEnabled)"
               :before-change="toggleEnabled"
             />
           </div>
@@ -122,6 +122,13 @@
 
           <div class="config-grid">
             <section class="panel params-panel">
+              <ModuleChromeSync
+                v-if="module"
+                :module-id="module.id"
+                :supported="supportsChromeSync"
+                @version="setModuleChromeVersion"
+                @update:enabled="chromeSyncEnabled = $event"
+              />
               <div class="panel-head">
                 <div>
                   <div class="panel-title">{{ module.multi_account ? '账号列表' : '模块参数' }}</div>
@@ -458,6 +465,7 @@ import RandomScheduleField from '@/components/RandomScheduleField.vue'
 import RunLogDrawer from '@/components/RunLogDrawer.vue'
 import { logsApi, modulesApi } from '@/api'
 import { useAppStore } from '@/stores/app'
+import ModuleChromeSync from '@/components/ModuleChromeSync.vue'
 import {
   cycleDayLabel,
   describeSchedule,
@@ -493,6 +501,8 @@ const repeatCycle = ref('daily')
 const repeatSubValue = ref('')
 const pushIndependent = ref(false)
 const pushUnified = ref(false)
+const chromeSyncEnabled = ref(false)
+const supportsChromeSync = computed(() => (module.value?.param_schema || []).some((item) => item.key === 'chrome_version'))
 const activeTab = ref(route.query.tab === 'logs' ? 'logs' : 'config')
 const saving = ref(false)
 const toggleLoading = ref(false)
@@ -512,6 +522,13 @@ const timezone = computed(() => appStore.meta?.timezone || 'Asia/Shanghai')
 const requiredCount = computed(
   () => (module.value?.param_schema || []).filter((item) => item.required).length,
 )
+function setModuleChromeVersion(value) {
+  const next = Number(value)
+  if (!Number.isInteger(next) || next < 1 || next > 999) return
+  if (module.value?.multi_account) return
+  params.chrome_version = next
+}
+
 const scheduleMeta = computed(() =>
   scheduleStatusMeta(module.value?.schedule_status || 'none'),
 )

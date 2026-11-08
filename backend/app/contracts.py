@@ -39,3 +39,9 @@ class PushConfigData(TypedDict):
     title_template: str
     body_template: str
     updated_at: datetime | None
+
+
+class ChromeSyncData(TypedDict):
+    supported: bool
+    enabled: bool
+    chrome_version: int | None

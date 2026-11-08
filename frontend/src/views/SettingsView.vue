@@ -158,6 +158,37 @@
       </aside>
     </div>
 
+    <section class="panel settings-card chrome-settings-card">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Chrome 版本</div>
+          <div class="panel-desc">用于 e-hentai / ikuuu_vpn 生成桌面 Chrome User-Agent；只保存主版本号，拼接时补 .0.0.0。</div>
+        </div>
+        <span class="section-icon sky"><el-icon><Monitor /></el-icon></span>
+      </div>
+      <div class="panel-body">
+        <div class="log-retention-control">
+          <label for="chrome-major-version">Chrome 主版本号</label>
+          <el-input-number
+            id="chrome-major-version"
+            v-model="chromeVersion"
+            :min="1"
+            :max="999"
+            :step="1"
+            controls-position="right"
+          />
+          <span>范围 1-999，默认 156</span>
+          <el-button type="primary" :loading="chromeStore.saving" @click="saveChromeVersion">
+            保存 Chrome 版本
+          </el-button>
+        </div>
+        <p class="channel-note">
+          开启模块详情页的“同步全局 Chrome 版本”后，保存这里会自动覆盖并保存该模块的
+          <code>chrome_version</code> 参数。模块 UA 始终只读取自身参数。
+        </p>
+      </div>
+    </section>
+
     <section class="panel push-panel">
       <div class="panel-head push-head">
         <div class="push-title-wrap">
@@ -346,6 +377,7 @@ import {
   Grid,
   InfoFilled,
   Lock,
+  Monitor,
   Promotion,
   RefreshLeft,
   Select,
@@ -356,10 +388,13 @@ import {
 } from '@element-plus/icons-vue'
 import { pushApi, systemApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { useChromeStore } from '@/stores/chrome'
 import { initialOf } from '@/utils/format'
 
 const router = useRouter()
 const auth = useAuthStore()
+const chromeStore = useChromeStore()
+const chromeVersion = ref(156)
 
 const loading = ref(false)
 const usernameFormRef = ref(null)
@@ -681,9 +716,23 @@ async function testPush() {
   }
 }
 
+async function saveChromeVersion() {
+  try {
+    chromeVersion.value = await chromeStore.update(chromeVersion.value)
+    ElMessage.success('Chrome 版本已保存，已开启同步的模块会自动更新')
+  } catch (error) {
+    ElMessage.warning(error?.message || 'Chrome 版本保存失败')
+  }
+}
+
 onMounted(async () => {
   loading.value = true
   await Promise.all([loadPushConfig(), loadLogSettings()])
+  try {
+    chromeVersion.value = await chromeStore.load()
+  } catch {
+    // HTTP layer shows the error.
+  }
   loading.value = false
 })
 </script>

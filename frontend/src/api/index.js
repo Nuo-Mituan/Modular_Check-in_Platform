@@ -24,6 +24,8 @@ export const modulesApi = {
       timeout: 120000,
     }),
   regenerateSchedule: (id) => http.post(`/modules/${id}/schedule/regenerate`),
+  getChromeSync: (id) => http.get(`/modules/${id}/chrome-sync`),
+  updateChromeSync: (id, payload) => http.put(`/modules/${id}/chrome-sync`, payload),
   revealSensitive: (id, payload) =>
     http.post(`/modules/${id}/reveal-sensitive`, payload),
 }
@@ -65,6 +67,8 @@ export const systemApi = {
   updateDeveloperMode: (enabled) => http.put('/settings/developer', { enabled }),
   getLogSettings: () => http.get('/settings/logs'),
   updateLogSettings: (payload) => http.put('/settings/logs', payload),
+  getChromeSettings: () => http.get('/settings/chrome'),
+  updateChromeSettings: (payload) => http.put('/settings/chrome', payload),
   systemLogs: (params) => http.get('/system/logs', { params }),
   metrics: () => http.get('/system/metrics'),
 }

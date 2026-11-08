@@ -441,3 +441,21 @@ class VersionInfoOut(BaseModel):
     payload_checksum: str | None = None
     payload_bytes: int | None = None
     environment: str
+
+
+class ChromeSettingsOut(BaseModel):
+    chrome_major_version: int
+
+
+class ChromeSettingsUpdate(BaseModel):
+    chrome_major_version: int
+
+
+class ChromeSyncOut(BaseModel):
+    supported: bool
+    enabled: bool
+    chrome_version: int | None = None
+
+
+class ChromeSyncUpdate(BaseModel):
+    enabled: bool

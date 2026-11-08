@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from ..config import settings
-from ..database import SessionLocal
+from sqlalchemy.ext.asyncio import AsyncSession
+from ..database import SessionLocal, get_db
 from ..deps import get_current_user
 from ..schemas import (
     HealthOut,
@@ -24,6 +25,8 @@ from ..schemas import (
     SystemLogOut,
     SystemLogPage,
     VersionInfoOut,
+    ChromeSettingsOut,
+    ChromeSettingsUpdate,
 )
 from ..scheduling import CYCLE_LABELS, REPEAT_CYCLES
 from ..services.maintenance import purge_old_logs
@@ -31,6 +34,7 @@ from ..services.ring_log import ring_log
 from ..services.push_outbox import pending_count as outbox_pending_count
 from ..services.auth_sessions import invalidate_all_sessions
 from ..services.preferences import set_developer_mode
+from ..services.chrome_sync import get_global_chrome_version, set_global_chrome_version
 from ..services.hub import hub
 from ..services.scheduler import scheduler_service
 from ..timeutils import utcnow
@@ -122,6 +126,23 @@ async def _log_settings() -> LogSettingsOut:
         total_rows=int(stats.get("total_rows", 0)),  # type: ignore[call-overload]  # TODO(v1.0.3): fix typing
         total_bytes=int(stats.get("total_bytes", 0)),  # type: ignore[call-overload]  # TODO(v1.0.3): fix typing
     )
+
+
+@settings_router.get("/chrome", response_model=ChromeSettingsOut, summary="读取全局 Chrome 版本")
+async def get_chrome_settings(db: AsyncSession = Depends(get_db)) -> ChromeSettingsOut:
+    return ChromeSettingsOut(chrome_major_version=await get_global_chrome_version(db))
+
+
+@settings_router.put("/chrome", response_model=ChromeSettingsOut, summary="保存全局 Chrome 版本")
+async def update_chrome_settings(
+    payload: ChromeSettingsUpdate, db: AsyncSession = Depends(get_db)
+) -> ChromeSettingsOut:
+    try:
+        version, _ = await set_global_chrome_version(db, payload.chrome_major_version)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await db.commit()
+    return ChromeSettingsOut(chrome_major_version=version)
 
 
 @settings_router.get("/logs", response_model=LogSettingsOut, summary="读取日志保留设置")

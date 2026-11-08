@@ -21,6 +21,7 @@
 | Bark / Server酱 / PushPlus / 钉钉 / 飞书 | 平台推送服务 | 无；不要自己实现推送 |
 | 成功 / 失败 / 部分失败 / 随机失败通知 | 平台推送服务 | 返回准确的 `success` 与 `message` |
 | 账号标识脱敏、参数加密、执行日志 | 平台 | 不要在日志打印敏感明文 |
+| 下载文件存储 | 平台提供 `DOWN_DIR` 共享目录 | 写入 `DOWN_DIR/<module_key>/`，自行清理 |
 
 模块开发者只需要保证：
 
@@ -100,6 +101,36 @@ modules/
 
 只有当旧记录仍使用 `legacy_key`、且旧目录已不存在时，平台才会复用旧记录；否则会作为
 新模块处理并参与目录唯一性冲突检查。
+
+### 2.2 下载目录（DOWN_DIR）
+
+带下载功能的模块不要写入模块源码目录，也不要自行假设当前工作目录。平台统一提供下载目录：
+
+| 环境 | 路径 |
+|---|---|
+| Docker 容器 | `/app/down`（镜像固定 `DOWN_DIR=/app/down`，`docker-compose.yml` 默认挂载宿主机 `./down`） |
+| 本地运行 | 项目根目录 `down/`；可用 `DOWN_DIR` 环境变量覆盖 |
+
+平台在启动时创建该目录、`chmod 700`，并 chown 到 `PUID:PGID`；模块与主进程同 UID，
+因此可直接读取和写入。平台还会把解析后的绝对路径写入 `DOWN_DIR` 环境变量：
+
+```python
+import os
+from pathlib import Path
+
+download_root = Path(os.environ.get("DOWN_DIR", "/app/down"))
+module_dir = download_root / "my_checkin"  # 建议每个模块使用独立子目录
+module_dir.mkdir(parents=True, exist_ok=True)
+```
+
+约定：
+
+- 每个模块使用 `DOWN_DIR/<module_key>/` 子目录，避免多个模块文件名冲突；
+- 下载文件先写同目录临时文件，再 `os.replace()` 原子替换；
+- 不要写入 `modules/`、`data/` 中的数据库/密钥目录，也不要把同步状态、日志、Token 放进下载目录；
+- 平台不自动清理 `down/`，模块应自行处理过期文件或提示磁盘占用；
+- `down/` 不通过 Web 静态服务暴露，模块需要自行决定是否提供下载入口；
+- 备份策略按需把 `down/` 加入备份，下载文件通常不参与数据库恢复。
 
 ---
 
@@ -830,3 +861,20 @@ logging.getLogger("modules.my_module").info("结构化输出")
 2. 读取按 `seq`，不要依赖文件行序；
 3. 敏感值必须脱敏；平台会做正则和上下文值替换，但模块仍应避免输出明文；
 4. 历史执行正文从环形日志读取，`execution_logs.output` 对新执行不再写入。
+
+
+## Chrome 版本同步接入（v1.0.8）
+
+模块如需支持全局 Chrome 版本同步：
+
+1. 在 `config.json` 的 `params` 中声明：
+   ```json
+   {"key": "chrome_version", "label": "Chrome 主版本号", "type": "number", "default": 156}
+   ```
+2. UA 生成函数必须接收显式整数 `chrome_version`，不得读取全局设置或硬编码完整版本号：
+   ```text
+   Chrome/<chrome_version>.0.0.0
+   ```
+3. 模块详情页会自动显示「同步全局 Chrome 版本」Switch；无此参数的模块显示 disabled。
+4. 开启同步后，后端会在全局版本保存时覆盖模块参数并持久化；关闭后保留当前值。
+5. 不支持 Chrome UA 的模块不要声明该参数。

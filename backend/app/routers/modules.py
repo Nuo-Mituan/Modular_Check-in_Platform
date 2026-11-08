@@ -57,6 +57,8 @@ from ..scheduling import (
     validate_schedule,
 )
 from ..schemas import (
+    ChromeSyncOut,
+    ChromeSyncUpdate,
     DatabaseUnavailableResponse,
     AccountOut,
     MessageResponse,
@@ -79,6 +81,7 @@ from ..security import verify_password
 from ..services import execution
 from ..services.auth_guard import lock_for_user, sensitive_limiter
 from ..services.ownership import owner_user_id
+from ..services.chrome_sync import get_module_sync, module_supports_chrome, set_module_sync
 from ..services.module_update import (
     ModuleUpdateError,
     ModuleUpdateHooks,
@@ -940,6 +943,25 @@ async def reveal_sensitive(
             params={} if module.multi_account else sensitive_params,
             accounts=sensitive_accounts,
         )
+
+
+@router.get("/{module_id}/chrome-sync", response_model=ChromeSyncOut, summary="读取模块 Chrome 同步状态")
+async def get_chrome_sync(module_id: int, db: AsyncSession = Depends(get_db)) -> ChromeSyncOut:
+    module = await _get_module_or_404(db, module_id)
+    data = await get_module_sync(db, module)
+    return ChromeSyncOut(**data)
+
+
+@router.put("/{module_id}/chrome-sync", response_model=ChromeSyncOut, summary="设置模块 Chrome 同步开关")
+async def update_chrome_sync(
+    module_id: int, payload: ChromeSyncUpdate, db: AsyncSession = Depends(get_db)
+) -> ChromeSyncOut:
+    module = await _get_module_or_404(db, module_id)
+    if not await module_supports_chrome(module):
+        raise HTTPException(status_code=400, detail="该模块不支持自定义 Chrome 版本")
+    data = await set_module_sync(db, module, payload.enabled)
+    await db.commit()
+    return ChromeSyncOut(**data)
 
 
 @router.put("/{module_id}", response_model=ModuleDetail, summary="保存账号、随机时间与推送开关")
