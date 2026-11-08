@@ -45,7 +45,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/app ./app
 COPY --from=frontend-builder /web/dist ./static
 COPY modules ./modules
-COPY templates ./templates
 COPY docker-entrypoint.py /usr/local/bin/docker-entrypoint.py
 
 RUN mkdir -p /app/data /app/logs /app/modules /app/down /app/app/push_drivers/custom \
