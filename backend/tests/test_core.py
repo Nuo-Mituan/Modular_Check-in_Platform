@@ -409,3 +409,17 @@ def test_multi_account_normalization_and_relative_import() -> None:
     finally:
         unload_runner(runner)
     assert all(not name.startswith(runner.name) for name in __import__("sys").modules)
+
+
+def test_chrome_version_param_boundaries() -> None:
+    from app.module_loader import ModuleConfig, ModuleParam
+
+    config = ModuleConfig(
+        name="chrome-test",
+        params=[ModuleParam(key="chrome_version", label="Chrome 主版本号", type="number")],
+    )
+    for value in (1, 999):
+        assert validate_and_normalize_params(config, {"chrome_version": value})["chrome_version"] == value
+    for value in (0, 1000, "not-a-number", 1.5):
+        with pytest.raises(ModuleConfigError):
+            validate_and_normalize_params(config, {"chrome_version": value})

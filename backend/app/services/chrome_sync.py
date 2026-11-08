@@ -62,11 +62,17 @@ async def module_sync_enabled(db: AsyncSession, module_id: int) -> bool:
     return bool(row and row.value == "1")
 
 
-async def _write_module_version(db: AsyncSession, module: Module, version: int) -> bool:
+async def _write_module_version(
+    db: AsyncSession,
+    module: Module,
+    version: int,
+    *,
+    user_id: int | None = None,
+) -> bool:
     if not await module_supports_chrome(module):
         return False
     context = EncryptionContext(
-        user_id=await owner_user_id(db),
+        user_id=user_id if user_id is not None else await owner_user_id(db),
         module_key=module.key,
         account_index=-1,
     )
@@ -116,10 +122,28 @@ async def get_module_sync(db: AsyncSession, module: Module) -> ChromeSyncData:
 async def set_global_chrome_version(db: AsyncSession, value: object) -> tuple[int, int]:
     version = valid_chrome_version(value)
     await _set_setting(db, GLOBAL_KEY, str(version))
-    rows = (await db.execute(select(Module))).scalars().all()
+    # One settings query + one modules query; avoid per-module lookups.
+    setting_rows = (
+        await db.execute(
+            select(AppSetting).where(
+                AppSetting.key.like("chrome_sync:%"), AppSetting.value == "1"
+            )
+        )
+    ).scalars().all()
+    enabled_ids = []
+    for row in setting_rows:
+        try:
+            enabled_ids.append(int(row.key.split(":", 1)[1]))
+        except (IndexError, ValueError):
+            continue
+    if not enabled_ids:
+        return version, 0
+    modules = (
+        await db.execute(select(Module).where(Module.id.in_(enabled_ids)))
+    ).scalars().all()
+    user_id = await owner_user_id(db)
     changed = 0
-    for module in rows:
-        if await module_sync_enabled(db, module.id):
-            if await _write_module_version(db, module, version):
-                changed += 1
+    for module in modules:
+        if await _write_module_version(db, module, version, user_id=user_id):
+            changed += 1
     return version, changed

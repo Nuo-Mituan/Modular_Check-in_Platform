@@ -1414,7 +1414,11 @@ def validate_and_normalize_params(
                 raise ModuleConfigError(f"参数「{param.label}」不能小于 {param.min:g}")
             if param.max is not None and number > param.max:
                 raise ModuleConfigError(f"参数「{param.label}」不能大于 {param.max:g}")
-            normalized[param.key] = int(number) if number.is_integer() else number
+            normalized_value = int(number) if number.is_integer() else number
+            if param.key == "chrome_version":
+                if not isinstance(normalized_value, int) or not 1 <= normalized_value <= 999:
+                    raise ModuleConfigError("参数「Chrome 主版本号」必须是 1-999 的整数")
+            normalized[param.key] = normalized_value
             continue
 
         if param.type == "select":
