@@ -1,11 +1,13 @@
 # 签到云台 · Modular Check-in Platform
 
-> ## v1.0.7 Release
+> ## v1.0.8 开发中
 >
-> 本次 v1.0.7 版本包含统一环形日志、AES-256-GCM v2 安全基础、推送驱动与独立/统一推送、
-> 开发者模式，以及模块图标系统。v1.0.7 移除模块 SVG 图标支持（`.svg` 返回 415），
-> 图标支持集统一为 PNG/JPG/JPEG/WebP/ICO；图标错误新增稳定 `code` 字段。
+> v1.0.8 新增 Chrome 主版本号全局设置与模块级同步：全局值持久化在
+> `app_settings`，模块 UA 仍只读取自身 `params.chrome_version`；开关仅授权
+> “全局修改时覆盖写入模块参数”，关闭不会回滚模块值。
 >
+> - Chrome 同步说明：[docs/V1.0.8_CHROME_SYNC.md](docs/V1.0.8_CHROME_SYNC.md)
+> - v1.0.8 变更说明：[docs/RELEASE_NOTES_v1.0.8.md](docs/RELEASE_NOTES_v1.0.8.md)
 > - 发布与变更管制：[docs/RELEASE_POLICY.md](docs/RELEASE_POLICY.md)
 > - Docker 验证 SOP：[docs/DOCKER_GATE_SOP.md](docs/DOCKER_GATE_SOP.md)
 > - 统一推送：[docs/UNIFIED_PUSH.md](docs/UNIFIED_PUSH.md)
@@ -25,7 +27,9 @@
 > v1.0.4（周期子选项、未认证页面隐私）见
 > [docs/ITERATION4_CHANGES.md](docs/ITERATION4_CHANGES.md)；
 > v1.0.5（安全基础、环形日志、推送重构、开发者模式、模块图标）见
-> [docs/ITERATION6_CHANGES.md](docs/ITERATION6_CHANGES.md)。
+> [docs/ITERATION6_CHANGES.md](docs/ITERATION6_CHANGES.md)；
+> v1.0.7（发布清单、版本接口、模块图标与质量门禁）见
+> [docs/RELEASE_NOTES_v1.0.7.md](docs/RELEASE_NOTES_v1.0.7.md)。
 
 <p align="center">
   <img src="docs/screenshots/dashboard.png" width="49%" alt="运行概览" />
@@ -60,6 +64,9 @@
 
 ## 核心特性
 
+- **Chrome 版本同步**：用户设置页维护全局 Chrome 主版本号（默认 156，范围 1-999）；
+  `e-hentai` / `ikuuu_vpn` 等声明 `chrome_version` 的模块可开启同步 Switch，
+  全局更新时自动覆盖并保存模块参数；关闭 Switch 保留当前模块值。无该参数的模块显示 disabled。
 - **多源模块图标**：支持 Emoji、本地 PNG/JPG/WebP/ICO、Base64 Data URI、HTTPS URL；本地栅格图标自动转 RGBA PNG 保留透明通道，非法或加载失败统一降级为 ⚠️。
 - **模块热插拔**：上传 ZIP 或把模块目录放进 `modules/` 后点击扫描，无需重启服务；
   支持 `directory_name` 物理目录名与 `legacy_key` 目录迁移，API key 与磁盘目录解耦。
@@ -286,6 +293,7 @@ modular-check-in-platform/
 │       ├── main.py
 │       └── utils.py
 ├── down/                            # 下载模块共享目录（运行时内容不入库）
+│                                   # 注意：release payload 不包含 modules/ 与 down/
 ├── templates/
 │   └── advanced_checkin/           # 进阶模板：多账号入口、Cookie 刷新、重试
 │       ├── config.json
@@ -300,6 +308,8 @@ modular-check-in-platform/
 │   ├── PRODUCTION_SECURITY.md      # 内网部署安全指南
 │   ├── BACKUP_AND_MIGRATION.md     # 备份、恢复与迁移
 │   ├── UNIFIED_PUSH.md             # 统一推送说明
+│   ├── V1.0.8_CHROME_SYNC.md       # Chrome 版本全局同步与模块 Switch 说明
+│   ├── RELEASE_NOTES_v1.0.8.md     # v1.0.8 变更说明
 │   ├── playbooks/                  # 状态机重构 Playbook 与团队赋能材料
 │   ├── runbooks/                   # 金丝雀发布与回滚检查清单
 │   └── screenshots/
@@ -335,6 +345,7 @@ down/<module_key>/        # 下载模块共享目录（带下载功能的模块�
 - 连续输错当前密码会触发临时限流；登录失败统一提示「用户名或密码错误」。
 - 修改密码后强制退出，需要使用新密码重新登录。
 - 同一页面可配置全局推送渠道与消息模板。
+- 「Chrome 版本」可设置全局主版本号（1-999）；开启模块同步后，保存全局值会覆盖并保存对应模块的 `chrome_version`，模块 UA 始终读取自身参数。
 
 ### 签到模块列表
 
@@ -357,6 +368,7 @@ down/<module_key>/        # 下载模块共享目录（带下载功能的模块�
 - 周期子选项：每周选择周一至周日；每月选择 1–28 日；每年选择月-日（2 月 29 日仅闰年执行）。
 - 页面展示「本次执行时间」与状态；可手动「重新生成」。
 - 模块页提供「启用推送」开关，推送内容由全局模板渲染。
+- 模块页统一显示「同步全局 Chrome 版本」Switch：仅当 `params` 声明 `chrome_version` 时可用；开启后输入框只读，关闭后恢复独立编辑并保留当前值。
 - 保存后若时间窗 / 周期变化，会取消旧计划并立即生成本期新时间。
 - 「使用模块默认时间窗」可恢复 `config.json` 的 `default_*` 值。
 

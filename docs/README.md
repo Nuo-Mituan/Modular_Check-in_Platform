@@ -8,6 +8,7 @@
 - [模块开发指南](MODULE_DEVELOPMENT.md)：目录结构、`config.json`、`directory_name` /
   `legacy_key`、参数定义、图标、多账号、随机调度、日志与 API 速查。
 - [统一推送](UNIFIED_PUSH.md)：推送渠道、模板与排障。
+- [Chrome 版本同步](V1.0.8_CHROME_SYNC.md)：全局 Chrome 主版本号、模块 Switch 语义与持久化。
 - [进阶模板](../templates/advanced_checkin/README.md)：真实场景模块骨架。
 - 示例模块：[demo_checkin](../modules/demo_checkin)、[moyu_energy](../modules/moyu_energy)。
 
@@ -33,4 +34,6 @@
 - [v1.0.4 变更说明](RELEASE_NOTES_v1.0.4.md)
 - [v1.0.5 变更说明](RELEASE_NOTES_v1.0.5.md)
 - [v1.0.6 变更说明](RELEASE_NOTES_v1.0.6.md)
+- [v1.0.7 变更说明（草案）](RELEASE_NOTES_v1.0.7.md)
+- [v1.0.8 变更说明（草案）](RELEASE_NOTES_v1.0.8.md)
 - [技术债清单](TECH_DEBT.md)
