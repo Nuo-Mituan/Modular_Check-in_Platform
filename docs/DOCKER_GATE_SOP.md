@@ -57,7 +57,7 @@ docker compose build --no-cache
 
 - `backend/tests`；
 - `requirements-dev.txt` / pytest；
-- `templates`、`modules`；
+- `modules`；`templates/` 仅保留源码模板，不进入镜像；
 - `/app/data`、`/app/logs`、`/app/down`。
 
 ## 4. 容器内全量技术债回归
