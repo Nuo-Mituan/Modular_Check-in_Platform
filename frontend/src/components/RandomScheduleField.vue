@@ -34,6 +34,8 @@
       </div>
     </div>
 
+    <p class="time-window-hint">开始与结束相同 = 固定时间执行；结束时间不能早于开始时间。</p>
+
     <div class="cycle-control">
       <label class="field-label">重复周期</label>
       <el-select

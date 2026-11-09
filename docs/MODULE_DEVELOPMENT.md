@@ -197,7 +197,7 @@ module_dir.mkdir(parents=True, exist_ok=True)
 | `icon_source` | string | 否 | `"url"` | **旧兼容字段**：`url` / `base64` / `local`。 |
 | `icon_data` | string | 否 | — | **旧兼容字段**：旧版 base64 图标数据。 |
 | `default_start_time` | string | 否 | 旧 Cron 推导或 `08:00` | 默认开始时间，24 小时制 `HH:mm`。 |
-| `default_end_time` | string | 否 | 旧 Cron 推导或 `10:00` | 默认结束时间，必须晚于开始时间。 |
+| `default_end_time` | string | 否 | 旧 Cron 推导或 `10:00` | 默认结束时间，不能早于开始时间；相同表示固定时间。 |
 | `default_repeat_cycle` | string | 否 | `"daily"` | `daily` / `weekly` / `monthly_15` / `monthly` / `yearly`。 |
 | `default_repeat_sub_value` | string | 否 | 见下 | 子选项默认值：每周 `1`-`7`；每月 `1`-`28`；每年 `M-D`。 |
 | `multi_account` | boolean | 否 | `false` | 是否启用多账号模式。 |
@@ -458,7 +458,8 @@ return {
 约束：
 
 - 24 小时制，必须补零，例如 `09:00`、`18:30`；
-- 开始时间必须严格早于结束时间；
+- 开始时间不能晚于结束时间；
+- 开始时间与结束时间相同表示固定时间执行，不生成随机时间；
 - 时间窗不能跨天；
 - 所有时间按服务器 `TIMEZONE`（默认 `Asia/Shanghai`）解释；
 - 数据库存储 UTC，界面按业务时区展示。

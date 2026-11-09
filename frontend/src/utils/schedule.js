@@ -59,8 +59,8 @@ export function validateSchedule(startTime, endTime) {
   if (!isValidTime(endTime)) {
     return '结束时间必须是 24 小时制 HH:mm，例如 11:30'
   }
-  if (String(startTime).trim() >= String(endTime).trim()) {
-    return '开始时间必须早于结束时间（时间窗不能跨天）'
+  if (String(startTime).trim() > String(endTime).trim()) {
+    return '开始时间不能晚于结束时间（时间窗不能跨天）'
   }
   return ''
 }
@@ -173,6 +173,9 @@ export function cycleDayLabel(value, subValue = '') {
 export function describeSchedule(startTime, endTime, repeatCycle, repeatSubValue = '') {
   if (!isValidTime(startTime) || !isValidTime(endTime)) {
     return '尚未设置有效的时间窗'
+  }
+  if (startTime === endTime) {
+    return `${cycleDayLabel(repeatCycle, repeatSubValue)} ${startTime} 固定执行`
   }
   return `${cycleDayLabel(repeatCycle, repeatSubValue)} ${startTime}–${endTime} 之间随机执行`
 }

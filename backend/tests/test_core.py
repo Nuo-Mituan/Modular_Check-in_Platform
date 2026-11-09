@@ -136,8 +136,7 @@ def test_schedule_validation_and_five_cycles() -> None:
 
     with pytest.raises(ScheduleError):
         validate_schedule("9:00", "10:00", "daily")
-    with pytest.raises(ScheduleError):
-        validate_schedule("10:00", "10:00", "daily")
+    assert validate_schedule("10:00", "10:00", "daily")[:2] == ("10:00", "10:00")
     with pytest.raises(ScheduleError):
         validate_schedule("11:00", "10:00", "daily")
     with pytest.raises(ScheduleError):
@@ -423,3 +422,15 @@ def test_chrome_version_param_boundaries() -> None:
     for value in (0, 1000, "not-a-number", 1.5):
         with pytest.raises(ModuleConfigError):
             validate_and_normalize_params(config, {"chrome_version": value})
+
+
+def test_fixed_schedule_window() -> None:
+    assert schedule_window(date(2026, 10, 18), "09:00", "09:00", TZ) == (
+        datetime(2026, 10, 18, 9, 0, tzinfo=TZ),
+        datetime(2026, 10, 18, 9, 0, tzinfo=TZ),
+    )
+    fixed = random_scheduled_at(
+        date(2026, 10, 18), "09:00", "09:00", TZ,
+        now=datetime(2026, 10, 18, 8, 0, tzinfo=TZ),
+    )
+    assert fixed == datetime(2026, 10, 18, 1, 0, tzinfo=timezone.utc)

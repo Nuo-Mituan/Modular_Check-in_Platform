@@ -171,8 +171,8 @@ def validate_schedule(
     start = validate_time_value(start_time, "开始时间")
     end = validate_time_value(end_time, "结束时间")
     cycle, sub = normalize_legacy_cycle(repeat_cycle, repeat_sub_value)
-    if start >= end:
-        raise ScheduleError("开始时间必须早于结束时间（时间窗不能跨天）")
+    if start > end:
+        raise ScheduleError("开始时间不能晚于结束时间（时间窗不能跨天）")
     return start, end, cycle, sub
 
 
@@ -297,8 +297,8 @@ def schedule_window(
 ) -> tuple[datetime, datetime]:
     start = _at_local(period_start, start_time, tz)
     end = _at_local(period_start, end_time, tz)
-    if start >= end:
-        raise ScheduleError("开始时间必须早于结束时间")
+    if start > end:
+        raise ScheduleError("开始时间不能晚于结束时间")
     return start, end
 
 
@@ -333,6 +333,9 @@ def random_scheduled_at(
     if period_start < current.date():
         return None
     start, end = schedule_window(period_start, start_time, end_time, tz)
+    if start == end:
+        # A zero-length window is a fixed-time schedule, not random.
+        return start.astimezone(timezone.utc) if current < start else None
 
     if period_start > current.date():
         lower = start
@@ -378,6 +381,8 @@ def readable_window(
     cycle: str,
     repeat_sub_value: object = None,
 ) -> str:
+    if start_time == end_time:
+        return f"{repeat_sub_label(cycle, repeat_sub_value)} {start_time} 固定执行"
     return (
         f"{repeat_sub_label(cycle, repeat_sub_value)} "
         f"{start_time}–{end_time} 随机执行"

@@ -198,8 +198,8 @@
               <section class="panel schedule-panel">
                 <div class="panel-head">
                   <div>
-                    <div class="panel-title">随机执行时间</div>
-                    <div class="panel-desc">执行日 00:00 生成随机时间，保存后立即重新安排</div>
+                    <div class="panel-title">执行时间</div>
+                    <div class="panel-desc">开始与结束相同则为固定时间执行；否则在时间窗内随机生成</div>
                   </div>
                   <span class="cron-icon"><el-icon><Timer /></el-icon></span>
                 </div>
@@ -218,7 +218,7 @@
                   <div class="schedule-summary">
                     <div class="summary-row">
                       <span>当前已保存</span>
-                      <code>{{ module.start_time }}–{{ module.end_time }} · {{ cycleDayLabel(module.repeat_cycle, module.repeat_sub_value) }}</code>
+                      <code>{{ module.start_time === module.end_time ? `${module.start_time} 固定执行` : `${module.start_time}–${module.end_time}` }} · {{ cycleDayLabel(module.repeat_cycle, module.repeat_sub_value) }}</code>
                     </div>
                     <div class="summary-row">
                       <span>本次执行时间</span>
