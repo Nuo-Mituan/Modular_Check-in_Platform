@@ -441,6 +441,6 @@ def test_chrome_sync_validator_rejects_float() -> None:
 
     assert valid_chrome_version(1) == 1
     assert valid_chrome_version(999) == 999
-    for value in (0, 1000, True, 1.5, "1.5", "abc"):
+    for value in (0, 1000, True, False, None, "", 1.5, "1.5", "abc", "１２３"):
         with pytest.raises(ValueError):
             valid_chrome_version(value)

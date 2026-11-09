@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +33,7 @@ def valid_chrome_version(value: object) -> int:
         raise ValueError("Chrome 版本必须为整数")
     if isinstance(value, int):
         number = value
-    elif isinstance(value, str) and value.strip().isdigit():
+    elif isinstance(value, str) and re.fullmatch(r"[0-9]+", value.strip()):
         number = int(value.strip())
     else:
         raise ValueError("Chrome 版本必须为整数")

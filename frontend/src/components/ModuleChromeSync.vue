@@ -85,6 +85,7 @@ watch(
 watch(
   () => props.moduleId,
   () => load(),
+  { immediate: true },
 )
 
 onMounted(async () => {
