@@ -186,7 +186,7 @@ let healthTimer = null
 
 const navItems = [
   { name: 'dashboard', label: '运行概览', icon: Odometer },
-  { name: 'modules', label: '签到模块', icon: Grid },
+  { name: 'modules', label: '模块目录', icon: Grid },
   { name: 'logs', label: '执行记录', icon: Tickets },
   { name: 'push-center', label: '推送中心', icon: Promotion },
   { name: 'system-logs', label: '系统日志', icon: Document },

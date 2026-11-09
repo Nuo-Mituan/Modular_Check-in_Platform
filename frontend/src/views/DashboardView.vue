@@ -27,7 +27,7 @@
           <div class="hero-actions">
             <el-button type="primary" class="hero-primary" @click="router.push('/modules')">
               <el-icon><Grid /></el-icon>
-              管理签到模块
+              模块管理
             </el-button>
             <button type="button" class="hero-ghost" @click="refresh">
               <el-icon :class="{ 'is-loading': loading }"><Refresh /></el-icon>

@@ -31,13 +31,13 @@ const routes = [
         path: 'modules',
         name: 'modules',
         component: () => import('@/views/ModulesView.vue'),
-        meta: { title: '签到模块' },
+        meta: { title: '模块目录' },
       },
       {
         path: 'modules/:id',
         name: 'module-detail',
         component: () => import('@/views/ModuleDetailView.vue'),
-        meta: { title: '模块配置', parent: '签到模块' },
+        meta: { title: '模块配置', parent: '模块目录' },
       },
       {
         path: 'logs',

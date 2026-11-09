@@ -3,7 +3,7 @@
     <header class="page-header">
       <div>
         <span class="eyebrow">MODULE LIBRARY</span>
-        <h1 class="page-title">签到模块</h1>
+        <h1 class="page-title">模块目录</h1>
         <p class="page-subtitle">
           每个模块都是独立插件。上传或扫描目录即可热加载，无需重启服务。
         </p>
@@ -245,7 +245,7 @@
 
     <el-dialog
       v-model="uploadDialogOpen"
-      title="上传签到模块"
+      title="上传模块"
       width="580px"
       :close-on-click-modal="false"
       @closed="resetUploadForm"
