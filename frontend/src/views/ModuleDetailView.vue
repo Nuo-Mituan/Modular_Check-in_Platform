@@ -622,6 +622,7 @@ function applyModule(detail) {
 }
 
 async function initialize() {
+  chromeSyncEnabled.value = false
   loading.value = true
   notFound.value = false
   module.value = null

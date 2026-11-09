@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +12,7 @@ from ..crypto import EncryptionContext, parameter_cipher
 from ..models import AppSetting, Module
 from .ownership import owner_user_id
 
+logger = logging.getLogger(__name__)
 GLOBAL_KEY = "chrome_major_version"
 DEFAULT_CHROME_VERSION = 156
 MIN_CHROME_VERSION = 1
@@ -20,13 +23,19 @@ def _sync_key(module_id: int) -> str:
     return f"chrome_sync:{module_id}"
 
 
+class ChromeSyncError(ValueError):
+    """Chrome sync could not update the module's persisted parameters."""
+
+
 def valid_chrome_version(value: object) -> int:
     if isinstance(value, bool):
         raise ValueError("Chrome 版本必须为整数")
-    try:
-        number = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError) as exc:
-        raise ValueError("Chrome 版本必须为整数") from exc
+    if isinstance(value, int):
+        number = value
+    elif isinstance(value, str) and value.strip().isdigit():
+        number = int(value.strip())
+    else:
+        raise ValueError("Chrome 版本必须为整数")
     if number < MIN_CHROME_VERSION or number > MAX_CHROME_VERSION:
         raise ValueError(f"Chrome 版本必须在 {MIN_CHROME_VERSION}-{MAX_CHROME_VERSION} 之间")
     return number
@@ -90,10 +99,11 @@ async def _write_module_version(
 async def set_module_sync(
     db: AsyncSession, module: Module, enabled: bool
 ) -> ChromeSyncData:
-    await _set_setting(db, _sync_key(module.id), "1" if enabled else "0")
     if enabled:
         version = await get_global_chrome_version(db)
-        await _write_module_version(db, module, version)
+        if not await _write_module_version(db, module, version):
+            raise ChromeSyncError("无法写入模块 Chrome 版本，请检查模块参数")
+    await _set_setting(db, _sync_key(module.id), "1" if enabled else "0")
     return await get_module_sync(db, module)
 
 
@@ -146,4 +156,6 @@ async def set_global_chrome_version(db: AsyncSession, value: object) -> tuple[in
     for module in modules:
         if await _write_module_version(db, module, version, user_id=user_id):
             changed += 1
+        else:
+            logger.warning("全局 Chrome 版本同步跳过模块 id=%s（参数不可写）", module.id)
     return version, changed

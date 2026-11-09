@@ -8,9 +8,11 @@ for this release.  Fresh databases are created by SQLAlchemy and need no work.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from sqlalchemy import select
 
+from .config import settings
 from .database import SessionLocal, engine
 from .models import Module
 from .scheduling import ScheduleError, normalize_legacy_cycle
@@ -55,6 +57,25 @@ def _legacy_window(cron: str | None) -> tuple[str, str]:
     return "08:00", "10:00"
 
 
+def _started_at_epoch(value: object) -> tuple[str, int]:
+    """Return a local ISO timestamp and epoch for a legacy execution row."""
+    parsed: datetime | None = None
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str) and value.strip():
+        try:
+            parsed = datetime.fromisoformat(value.strip())
+        except ValueError:
+            parsed = None
+    if parsed is None:
+        parsed = datetime.now(settings.timezone_info)
+        logger.warning("TD-19 回填无法解析 started_at=%r，使用迁移时刻", value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=settings.timezone_info)
+    local = parsed.astimezone(settings.timezone_info)
+    return local.isoformat(timespec="microseconds"), int(local.timestamp())
+
+
 async def _migrate_td19_output(connection) -> None:
     """Backfill legacy execution output into ring_logs, then drop the column."""
     dialect = engine.dialect.name
@@ -90,10 +111,10 @@ async def _migrate_td19_output(connection) -> None:
             await connection.exec_driver_sql(
                 f"UPDATE ring_state SET next_seq={placeholder} WHERE id=1", (seq + 1,)
             )
-        created = str(started_at or "")
+        created, epoch = _started_at_epoch(started_at)
         await connection.exec_driver_sql(
             f"INSERT INTO ring_logs (seq, scope_type, scope_key, category, level, text, byte_size, created_at, created_at_epoch, ref_type, ref_id) VALUES ({','.join([placeholder] * 11)})",
-            (seq, "module", module_key or "unknown", "execution", "OUT", text, len(text.encode("utf-8")), created, 0, "execution", log_id),
+            (seq, "module", module_key or "unknown", "execution", "OUT", text, len(text.encode("utf-8")), created, epoch, "execution", log_id),
         )
 
     if dialect == "sqlite":

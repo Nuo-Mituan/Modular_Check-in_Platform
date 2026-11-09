@@ -434,3 +434,13 @@ def test_fixed_schedule_window() -> None:
         now=datetime(2026, 10, 18, 8, 0, tzinfo=TZ),
     )
     assert fixed == datetime(2026, 10, 18, 1, 0, tzinfo=timezone.utc)
+
+
+def test_chrome_sync_validator_rejects_float() -> None:
+    from app.services.chrome_sync import valid_chrome_version
+
+    assert valid_chrome_version(1) == 1
+    assert valid_chrome_version(999) == 999
+    for value in (0, 1000, True, 1.5, "1.5", "abc"):
+        with pytest.raises(ValueError):
+            valid_chrome_version(value)

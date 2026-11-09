@@ -39,11 +39,15 @@ const saving = ref(false)
 
 async function load() {
   loading.value = true
+  enabled.value = false
+  emit('update:enabled', false)
   try {
     const data = await modulesApi.getChromeSync(props.moduleId)
     enabled.value = Boolean(data.enabled)
     emit('update:enabled', enabled.value)
     if (data.chrome_version != null) emit('version', Number(data.chrome_version))
+  } catch {
+    // HTTP layer reports the error; leave the switch in a safe disabled state.
   } finally {
     loading.value = false
   }
@@ -68,15 +72,23 @@ watch(
   () => chrome.chromeMajorVersion,
   async () => {
     if (!enabled.value) return
-    const detail = await modulesApi.get(props.moduleId)
-    const value = detail?.params?.chrome_version
-    if (value != null) emit('version', Number(value))
+    try {
+      const detail = await modulesApi.get(props.moduleId)
+      const value = detail?.params?.chrome_version
+      if (value != null) emit('version', Number(value))
+    } catch {
+      // Keep the last known value; the HTTP layer already surfaced the error.
+    }
   },
+)
+
+watch(
+  () => props.moduleId,
+  () => load(),
 )
 
 onMounted(async () => {
   await chrome.load().catch(() => {})
-  await load()
 })
 </script>
 

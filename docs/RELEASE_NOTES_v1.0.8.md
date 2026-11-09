@@ -47,3 +47,12 @@
 - PostgreSQL：路径代码已实现（`DROP COLUMN`），但未在真实 PG 实例验证，未做回滚演练。
 - TD-19 保持 Partial；读取侧已移除 legacy fallback。
 - SQLite 迁移的 `PRAGMA foreign_keys` 已改为 AUTOCOMMIT 连接上、显式事务外切换。
+
+
+## 审查修复
+
+- TD-19 回填 ring_logs 时使用 started_at 的真实 epoch，避免历史日志被 retention 立即删除。
+- Chrome 同步开启写入失败时回滚开关并返回 409，不再静默成功。
+- ModuleChromeSync 监听 moduleId 变化，避免路由复用导致状态串模块。
+- /api/version 的 git_commit 解析移到 asyncio.to_thread，并缓存结果。
+- valid_chrome_version 拒绝浮点数与布尔值。

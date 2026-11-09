@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
+from functools import lru_cache
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -60,7 +61,8 @@ meta_router = APIRouter(
 )
 
 
-def _git_commit() -> str:
+@lru_cache(maxsize=1)
+def _resolve_git_commit() -> str:
     configured = os.environ.get("GIT_COMMIT", "").strip()
     if configured:
         return configured
@@ -84,7 +86,7 @@ async def version_info(request: Request, response: Response) -> VersionInfoOut:
     return VersionInfoOut(
         version=settings.app_version,
         build_time=os.environ.get("BUILD_TIME", now),
-        git_commit=_git_commit(),
+        git_commit=await asyncio.to_thread(_resolve_git_commit),
         min_supported_client=os.environ.get("MIN_SUPPORTED_CLIENT", "1.0.0"),
         recommended=True,
         release_notes_url=f"/Releases/v{settings.app_version}/RELEASE_NOTES.md",

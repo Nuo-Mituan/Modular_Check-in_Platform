@@ -451,9 +451,12 @@ async def test_td19b_output_backfill_and_column_drop() -> None:
         cols = {row[1] for row in (await conn.exec_driver_sql("PRAGMA table_info(execution_logs)")).fetchall()}
         assert "output" not in cols
         result = await conn.exec_driver_sql(
-            "SELECT text, ref_id FROM ring_logs WHERE ref_type='execution'"
+            "SELECT text, ref_id, created_at_epoch FROM ring_logs WHERE ref_type='execution'"
         )
-        assert result.fetchone() == ("old-output", 1)
+        row = result.fetchone()
+        assert row is not None
+        assert row[0] == "old-output" and row[1] == 1
+        assert row[2] > 1_700_000_000
     await test_engine.dispose()
 
 

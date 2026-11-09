@@ -109,6 +109,7 @@
 - PostgreSQL 路径代码已实现，但当前环境无真实 PG 实例，未完成 PG 验证与回滚演练。
   TD-19 保持 ⬜ Partial，不标记完成。
 - 读取侧已移除 legacy fallback；`_LogSnapshot.legacy_output` 保留为空兼容字段。
+- 回填使用 started_at 的真实 epoch；同步失败/路由复用/版本接口阻塞问题已修复。
 - 修复 SQLite PRAGMA 时序：在 AUTOCOMMIT 连接先关闭 `foreign_keys`，再显式 `BEGIN`/`COMMIT` 执行重建，结束后恢复；`foreign_key_check` 与索引校验在事务内。
 
 ## TD-34 完成记录
