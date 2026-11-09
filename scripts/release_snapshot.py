@@ -17,13 +17,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED_DIRS = {
     ".git", "Releases", "node_modules", ".venv", "__pycache__",
-    ".pnpm-store", ".hypothesis", ".pytest_cache", ".mypy_cache",
+    ".pnpm-store", ".hypothesis", ".pytest_cache", ".mypy_cache", ".import_linter_cache",
     "dist", "tests", "data", "logs", "release", ".ruff_cache", ".github",
     "backups", "tools", "modules", "down",
 }
 EXCLUDED_FILES = {
     ".env", ".DS_Store", "代码审查指令.txt", "对外干净发布指令.txt",
-    "MANIFEST.json", "MANIFEST.sha256", "Dockerfile.dev", "pytest.ini",
+    "MANIFEST.json", "MANIFEST.sha256", "Dockerfile.dev", "pytest.ini", "pnpm-workspace.yaml",
 }
 EXCLUDED_SUFFIXES = {".pyc", ".zip", ".log", ".pem", ".key", ".gz", ".tgz"}
 TEST_PATTERNS = ("test_*.py", "*_test.py", "*.test.mjs", "conftest.py")

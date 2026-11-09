@@ -56,7 +56,7 @@
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| ⬜ | TD-19 | P3 | `services/execution.py` | 旧 `execution_logs.output` 字段保留 | 数据模型有历史包袱 | 下个大版本迁移后移除 | 平台维护者 |
+| ⬜ | TD-19 | P3 | `services/execution.py`、`migrations.py` | **Partial**：SQLite 回填/删列已验证；PostgreSQL 路径代码已实现但未在真实实例验证 | 数据模型有历史包袱 | 完成 PG 真实迁移/回滚演练后再转 ✅ | 平台维护者 |
 
 ### 已关闭（2）
 
@@ -102,11 +102,14 @@
 - TD-32（待登记，不计入当前 32 项口径）：`release_baseline.json` 按域拆分为
   pytest/openapi/mypy/lockfile 多文件，避免再次跨主题冲突。
 
-## TD-19 阻塞说明
+## TD-19 Partial 记录
 
-- TD-19b（回填 `execution_logs.output` 到 `ring_logs`、SQLite/PostgreSQL 删列）
-  需要独立迁移窗口、备份/回滚验证与双数据库测试；当前工作区无法安全执行破坏性迁移。
-  保持 ⬜，不计入 v1.0.8 完成数。
+- 2026-11-09：SQLite 路径完成旧 `execution_logs.output` 回填到 `ring_logs`
+  （ref_type=execution），重建表并删除列；迁移测试覆盖回填与列删除。
+- PostgreSQL 路径代码已实现，但当前环境无真实 PG 实例，未完成 PG 验证与回滚演练。
+  TD-19 保持 ⬜ Partial，不标记完成。
+- 读取侧已移除 legacy fallback；`_LogSnapshot.legacy_output` 保留为空兼容字段。
+- 修复 SQLite PRAGMA 时序：在 AUTOCOMMIT 连接先关闭 `foreign_keys`，再显式 `BEGIN`/`COMMIT` 执行重建，结束后恢复；`foreign_key_check` 与索引校验在事务内。
 
 ## TD-34 完成记录
 

@@ -7,6 +7,7 @@ import base64
 import hashlib
 import io
 import json
+import os
 import zipfile
 import stat
 import time
@@ -70,6 +71,8 @@ async def test_cookie_auth_security_and_modules() -> None:
     await initialize_modules()
     assert stat.S_IMODE(settings.data_dir.stat().st_mode) == 0o700
     assert stat.S_IMODE(settings.logs_dir.stat().st_mode) == 0o700
+    assert stat.S_IMODE(settings.down_dir.stat().st_mode) == 0o700
+    assert os.environ["DOWN_DIR"] == str(settings.down_dir)
     assert stat.S_IMODE((settings.data_dir / "checkin.db").stat().st_mode) == 0o600
 
     transport = ASGITransport(app=app)
@@ -687,29 +690,6 @@ async def test_cookie_auth_security_and_modules() -> None:
             ).json()
             assert replay_detail["last_seq"] == replay_seqs[-1]
 
-            # Pre-ring execution rows keep their output as a read-only fallback.
-            async with SessionLocal() as db:
-                legacy_log = ExecutionLog(
-                    module_id=module_id,
-                    module_key=demo["key"],
-                    module_name=demo["name"],
-                    trigger="manual",
-                    status="success",
-                    message="legacy output",
-                    output="legacy-output-from-v5\n",
-                    started_at=datetime.now(timezone.utc),
-                    finished_at=datetime.now(timezone.utc),
-                    duration_ms=1,
-                )
-                db.add(legacy_log)
-                await db.commit()
-                await db.refresh(legacy_log)
-                legacy_log_id = legacy_log.id
-            legacy_detail = (
-                await client.get(f"/api/logs/{legacy_log_id}")
-            ).json()
-            assert legacy_detail["output"] == "legacy-output-from-v5\n"
-            assert legacy_detail["last_seq"] == 0
 
             # A v5 row has push_enabled but NULL new switches.  The migration
             # must map it to independent push before any worker reads the row.

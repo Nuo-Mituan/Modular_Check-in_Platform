@@ -743,9 +743,14 @@ async def _finalize(
             module_key = log.module_key
             log.status = status
             log.message = redact_text(message)
-            # Full execution output lives in ring_logs keyed by ref_id.  Only
-            # the emergency fallback path above ever writes execution_logs.
-            log.output = redact_text(output) if output else None
+            # TD-19b: execution_logs.output has been removed; output lives
+            # only in ring_logs. A non-empty output means ring persistence
+            # failed; keep a visible warning instead of silently losing it.
+            if output:
+                log.message = redact_text(
+                    f"{message or ''}\n[警告] 日志存储失败，完整输出可能缺失"
+                ).strip()
+                logger.error("执行日志 ring 写入失败，输出未落库 log_id=%s", log_id)
             log.finished_at = finished_at
             log.duration_ms = duration_ms
         module = await db.get(Module, module_id)

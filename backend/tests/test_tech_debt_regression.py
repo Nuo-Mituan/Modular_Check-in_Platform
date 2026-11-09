@@ -314,10 +314,10 @@ def test_td17_temp_close_failure_does_not_raise(caplog) -> None:
     assert "关闭模块上传临时文件失败" in caplog.text
 
 
-def test_td19_legacy_output_remains_nullable() -> None:
+def test_td19_legacy_output_column_removed() -> None:
     from app.models import ExecutionLog
 
-    assert ExecutionLog.__table__.c.output.nullable is True
+    assert "output" not in ExecutionLog.__table__.c
 
 
 def test_td04_update_error_contract() -> None:
@@ -420,24 +420,58 @@ async def test_td19a_finalize_does_not_write_output(monkeypatch) -> None:
     async with SessionLocal() as db:
         row = await db.get(ExecutionLog, log_id)
         assert row is not None
-        assert row.output is None
         assert "日志存储失败" in (row.message or "")
 
 
-@pytest.mark.asyncio
-async def test_td19a_legacy_output_is_still_readable_as_fallback() -> None:
-    from app.database import SessionLocal, init_db
-    from app.models import ExecutionLog
-    from app.routers.logs import _load_snapshot
 
-    await init_db()
-    async with SessionLocal() as db:
-        row = ExecutionLog(
-            module_id=1, module_key="td19a-legacy", module_name="td19a-legacy",
-            status="success", output="legacy-only-output",
+
+@pytest.mark.asyncio
+async def test_td19b_output_backfill_and_column_drop() -> None:
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from app.migrations import _migrate_td19_output
+
+    test_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with test_engine.begin() as conn:
+        await conn.exec_driver_sql("CREATE TABLE modules (id INTEGER PRIMARY KEY)")
+        await conn.exec_driver_sql("INSERT INTO modules (id) VALUES (1)")
+        await conn.exec_driver_sql(
+            """CREATE TABLE execution_logs (
+                id INTEGER PRIMARY KEY, module_id INTEGER NOT NULL,
+                module_key TEXT NOT NULL, module_name TEXT NOT NULL,
+                trigger_type TEXT NOT NULL, status TEXT NOT NULL,
+                message TEXT, output TEXT, started_at TEXT NOT NULL,
+                finished_at TEXT, duration_ms INTEGER
+            )"""
         )
-        db.add(row)
-        await db.commit()
-        log_id = row.id
-    snapshot = await _load_snapshot(log_id)
-    assert snapshot.legacy_output == "legacy-only-output"
+        await conn.exec_driver_sql("CREATE TABLE ring_logs (seq INTEGER PRIMARY KEY, scope_type TEXT, scope_key TEXT, category TEXT, level TEXT, text TEXT, byte_size INTEGER, created_at TEXT, created_at_epoch INTEGER, ref_type TEXT, ref_id INTEGER)")
+        await conn.exec_driver_sql("CREATE TABLE ring_state (id INTEGER PRIMARY KEY, next_seq INTEGER)")
+        await conn.exec_driver_sql("INSERT INTO ring_state (id, next_seq) VALUES (1, 1)")
+        await conn.exec_driver_sql("INSERT INTO execution_logs (id, module_id, module_key, module_name, trigger_type, status, output, started_at) VALUES (1, 1, 'legacy', 'Legacy', 'manual', 'success', 'old-output', '2026-01-01T00:00:00')")
+        await _migrate_td19_output(conn)
+        cols = {row[1] for row in (await conn.exec_driver_sql("PRAGMA table_info(execution_logs)")).fetchall()}
+        assert "output" not in cols
+        result = await conn.exec_driver_sql(
+            "SELECT text, ref_id FROM ring_logs WHERE ref_type='execution'"
+        )
+        assert result.fetchone() == ("old-output", 1)
+    await test_engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_td19_sqlite_rollback_restores_foreign_keys(monkeypatch) -> None:
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from app import migrations
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+
+    async def boom(_connection) -> None:
+        raise RuntimeError("forced migration failure")
+
+    monkeypatch.setattr(migrations, "_migrate_td19_output", boom)
+    async with engine.connect() as conn:
+        conn = await conn.execution_options(isolation_level="AUTOCOMMIT")
+        with pytest.raises(RuntimeError, match="forced"):
+            await migrations._run_sqlite_td19(conn)
+        enabled = (await conn.exec_driver_sql("PRAGMA foreign_keys")).scalar()
+        assert enabled == 1
+    await engine.dispose()

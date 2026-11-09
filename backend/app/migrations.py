@@ -55,8 +55,133 @@ def _legacy_window(cron: str | None) -> tuple[str, str]:
     return "08:00", "10:00"
 
 
+async def _migrate_td19_output(connection) -> None:
+    """Backfill legacy execution output into ring_logs, then drop the column."""
+    dialect = engine.dialect.name
+    if dialect == "sqlite":
+        result = await connection.exec_driver_sql("PRAGMA table_info(execution_logs)")
+        columns = {row[1] for row in result.fetchall()}
+    else:
+        result = await connection.exec_driver_sql(
+            "SELECT column_name FROM information_schema.columns WHERE table_name='execution_logs'"
+        )
+        columns = {row[0] for row in result.fetchall()}
+    if "output" not in columns:
+        return
+
+    placeholder = "?" if dialect == "sqlite" else "%s"
+    rows = await connection.exec_driver_sql(
+        "SELECT id, module_key, output, started_at FROM execution_logs WHERE output IS NOT NULL AND output <> ''"
+    )
+    for log_id, module_key, text, started_at in rows.fetchall():
+        existing = await connection.exec_driver_sql(
+            f"SELECT 1 FROM ring_logs WHERE ref_type='execution' AND ref_id={placeholder} LIMIT 1",
+            (log_id,),
+        )
+        if existing.fetchone():
+            continue
+        state = await connection.exec_driver_sql("SELECT next_seq FROM ring_state WHERE id=1")
+        row = state.fetchone()
+        if row is None:
+            seq = 1
+            await connection.exec_driver_sql("INSERT INTO ring_state (id, next_seq) VALUES (1, 2)")
+        else:
+            seq = int(row[0])
+            await connection.exec_driver_sql(
+                f"UPDATE ring_state SET next_seq={placeholder} WHERE id=1", (seq + 1,)
+            )
+        created = str(started_at or "")
+        await connection.exec_driver_sql(
+            f"INSERT INTO ring_logs (seq, scope_type, scope_key, category, level, text, byte_size, created_at, created_at_epoch, ref_type, ref_id) VALUES ({','.join([placeholder] * 11)})",
+            (seq, "module", module_key or "unknown", "execution", "OUT", text, len(text.encode("utf-8")), created, 0, "execution", log_id),
+        )
+
+    if dialect == "sqlite":
+        await connection.exec_driver_sql(
+            """CREATE TABLE execution_logs_new (
+                id INTEGER NOT NULL PRIMARY KEY,
+                module_id INTEGER NOT NULL,
+                module_key VARCHAR(80) NOT NULL,
+                module_name VARCHAR(120) NOT NULL,
+                trigger_type VARCHAR(16) NOT NULL,
+                status VARCHAR(16) NOT NULL,
+                message TEXT,
+                started_at DATETIME NOT NULL,
+                finished_at DATETIME,
+                duration_ms INTEGER,
+                FOREIGN KEY(module_id) REFERENCES modules (id) ON DELETE CASCADE
+            )"""
+        )
+        await connection.exec_driver_sql(
+            """INSERT INTO execution_logs_new
+               (id, module_id, module_key, module_name, trigger_type, status, message, started_at, finished_at, duration_ms)
+               SELECT id, module_id, module_key, module_name, trigger_type, status, message, started_at, finished_at, duration_ms
+               FROM execution_logs"""
+        )
+        await connection.exec_driver_sql("DROP TABLE execution_logs")
+        await connection.exec_driver_sql("ALTER TABLE execution_logs_new RENAME TO execution_logs")
+        for name, columns_sql in (
+            ("ix_execution_logs_module_id", "module_id"),
+            ("ix_execution_logs_module_key", "module_key"),
+            ("ix_execution_logs_status", "status"),
+            ("ix_execution_logs_module_started", "module_id, started_at"),
+            ("ix_execution_logs_started", "started_at"),
+        ):
+            await connection.exec_driver_sql(
+                f'CREATE INDEX IF NOT EXISTS "{name}" ON execution_logs ({columns_sql})'
+            )
+        foreign_key_violations = (
+            await connection.exec_driver_sql("PRAGMA foreign_key_check")
+        ).fetchall()
+        indexes = {
+            row[1]
+            for row in (
+                await connection.exec_driver_sql("PRAGMA index_list(execution_logs)")
+            ).fetchall()
+        }
+        expected_indexes = {
+            "ix_execution_logs_module_id",
+            "ix_execution_logs_module_key",
+            "ix_execution_logs_status",
+            "ix_execution_logs_module_started",
+            "ix_execution_logs_started",
+        }
+        if foreign_key_violations:
+            raise RuntimeError(f"TD-19 migration foreign key violations: {foreign_key_violations[:3]}")
+        if not expected_indexes.issubset(indexes):
+            raise RuntimeError(f"TD-19 migration missing indexes: {sorted(expected_indexes - indexes)}")
+    else:
+        await connection.exec_driver_sql("ALTER TABLE execution_logs DROP COLUMN output")
+    logger.info("数据库迁移：TD-19 已回填 execution_logs.output 并删除列")
+
+
+async def _run_sqlite_td19(connection) -> None:
+    """Run TD-19 rebuild with PRAGMA toggled outside the SQLite transaction."""
+    await connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    try:
+        await connection.exec_driver_sql("BEGIN")
+        await _migrate_td19_output(connection)
+        await connection.exec_driver_sql("COMMIT")
+    except Exception:
+        await connection.exec_driver_sql("ROLLBACK")
+        raise
+    finally:
+        await connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+
+
 async def migrate_schema() -> None:
-    """Add random-schedule / multi-account columns to an existing SQLite DB."""
+    """Apply forward-only schema migrations."""
+    if engine.dialect.name == "sqlite":
+        # Python 3.12 sqlite3 also has autocommit; do not set autocommit=False
+        # here, or PRAGMA foreign_keys would silently become a no-op again.
+        # PRAGMA foreign_keys is a no-op inside a transaction. Toggle it on an
+        # AUTOCOMMIT connection, then run the rebuild in an explicit transaction.
+        async with engine.connect() as connection:
+            connection = await connection.execution_options(isolation_level="AUTOCOMMIT")
+            await _run_sqlite_td19(connection)
+    else:
+        async with engine.begin() as connection:
+            await _migrate_td19_output(connection)
     if engine.dialect.name != "sqlite":
         return
 

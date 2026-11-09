@@ -123,7 +123,7 @@ async def test_database_and_file_history_do_not_store_plaintext() -> None:
             module_id=module_id,
             status="failed",
             message=message,
-            output=output,
+            output="",
             finished_at=datetime.now(timezone.utc),
             duration_ms=10,
         )
@@ -142,7 +142,6 @@ async def test_database_and_file_history_do_not_store_plaintext() -> None:
         ring_rows = await asyncio.to_thread(ring_log.read_execution, log_id)
         for text in (
             stored.message or "",
-            stored.output or "",
             module.last_message or "",
             "".join(str(row["text"]) for row in ring_rows),
         ):

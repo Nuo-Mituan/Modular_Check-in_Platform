@@ -51,7 +51,6 @@ async def mark_stale_running_logs() -> int:
                 row.duration_ms = max(
                     0, int((now - row.started_at).total_seconds() * 1000)
                 )
-            row.output = None
             await asyncio.to_thread(
                 ring_log.append_execution,
                 module_key=row.module_key,
@@ -146,7 +145,7 @@ async def purge_old_logs(days: int | None = None) -> tuple[int, int]:
 
     The ring body is trimmed in 1000-row batches; old execution metadata and
     pre-ring file mirrors are removed with the same cutoff.  The remaining old
-    ``execution_logs.output`` values (from before the ring upgrade) are used as
+    Ring log rows are the only execution output source after TD-19b.
     a read-only fallback until their row is deleted.
     """
     retention = (

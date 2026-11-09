@@ -156,7 +156,6 @@ async def test_startup_retention_purges_old_history_and_files() -> None:
             module_name="Legacy Log Test",
             trigger="manual",
             status="success",
-            output="legacy plaintext that should be purged",
             started_at=datetime.now(timezone.utc) - timedelta(days=40),
             finished_at=datetime.now(timezone.utc) - timedelta(days=40),
             duration_ms=1,

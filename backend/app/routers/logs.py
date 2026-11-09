@@ -145,10 +145,6 @@ async def get_log(log_id: int, db: AsyncSession = Depends(get_db)) -> LogDetail:
     if log is None:
         raise HTTPException(status_code=404, detail="执行记录不存在")
     output, last_seq = await asyncio.to_thread(ring_log.read_execution_text, log_id)
-    # Old rows created before the ring migration retain their output as a
-    # read-only fallback; new rows never duplicate it in execution_logs.
-    if not output and log.output:
-        output = log.output
     detail = LogDetail.model_validate(log)
     return detail.model_copy(update={"output": output, "last_seq": last_seq})
 
@@ -171,7 +167,7 @@ async def _load_snapshot(log_id: int) -> _LogSnapshot:
             status=log.status,
             message=log.message,
             duration_ms=log.duration_ms,
-            legacy_output=log.output or "",
+            legacy_output="",
         )
 
 

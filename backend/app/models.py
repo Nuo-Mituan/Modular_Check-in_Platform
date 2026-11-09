@@ -188,9 +188,6 @@ class ExecutionLog(Base):
     trigger: Mapped[str] = mapped_column("trigger_type", String(16), default="manual")
     status: Mapped[str] = mapped_column(String(16), default="running", index=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Deprecated in rc.2: new output lives in ring_logs (ref_id=ExecutionLog.id).
-    # Kept nullable for v5 read-only fallback; removal is a v2.0 migration.
-    output: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
