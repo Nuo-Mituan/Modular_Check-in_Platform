@@ -41,12 +41,11 @@
 - 结束时间早于开始时间仍拒绝保存。
 
 
-## TD-19 Partial
+## TD-19 Ignored（PostgreSQL 不在当前交付范围）
 
 - SQLite：旧 `execution_logs.output` 已在启动迁移中回填到 `ring_logs`，随后重建表删除列；已有自动化迁移测试。
-- PostgreSQL：路径代码已实现（`DROP COLUMN`），但未在真实 PG 实例验证，未做回滚演练。
-- TD-19 保持 Partial；读取侧已移除 legacy fallback。
-- SQLite 迁移的 `PRAGMA foreign_keys` 已改为 AUTOCOMMIT 连接上、显式事务外切换。
+- PostgreSQL：当前镜像不含 PG 驱动、Compose 服务与迁移支持，不属于当前交付范围；不再以 Partial 阻塞 v1.0.8。
+- 读取侧已移除 legacy fallback。
 
 
 ## 审查修复

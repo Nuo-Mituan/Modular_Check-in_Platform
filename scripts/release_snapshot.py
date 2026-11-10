@@ -23,7 +23,7 @@ EXCLUDED_DIRS = {
 }
 EXCLUDED_FILES = {
     ".env", ".DS_Store", "代码审查指令.txt", "对外干净发布指令.txt",
-    "MANIFEST.json", "MANIFEST.sha256", "Dockerfile.dev", "pytest.ini", "pnpm-workspace.yaml",
+    "MANIFEST.json", "MANIFEST.sha256", "Dockerfile.dev", "pytest.ini", "pnpm-workspace.yaml", "verify_td19_postgres.py",
 }
 EXCLUDED_SUFFIXES = {".pyc", ".zip", ".log", ".pem", ".key", ".gz", ".tgz"}
 TEST_PATTERNS = ("test_*.py", "*_test.py", "*.test.mjs", "conftest.py")

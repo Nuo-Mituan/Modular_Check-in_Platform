@@ -52,16 +52,15 @@
 | ✅ | TD-23b | P1 | Releases/CI | release checklist --json + snapshot 前置 gate | 清单未机器化，manifest 无法证明 gate 已通过 | checklist 输出 JSON；snapshot 在 gate 通过后生成 manifest；provenance 写入 MANIFEST | 发布负责人 |
 | ✅ | TD-34 | P3 | `frontend/package-lock.json` / CI | npm audit 剩余 3 个 moderate（glob/js-beautify/editorconfig）；CI 未设 audit gate | 未来若把 audit 设为闸门会突然变红 | 先登记 known moderate；优先升级上游，必要时 overrides 并留 provenance | 前端维护者 |
 
-### 待清零（1）
+### 待清零（0）
 
-| 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| ⬜ | TD-19 | P3 | `services/execution.py`、`migrations.py` | **Partial**：SQLite 回填/删列已验证；PostgreSQL 路径代码已实现但未在真实实例验证 | 数据模型有历史包袱 | 完成 PG 真实迁移/回滚演练后再转 ✅ | 平台维护者 |
+无。
 
-### 已关闭（2）
+### 已关闭（3）
 
 | 状态 | ID | 项目 | 关闭理由 | 日期 |
 | --- | --- | --- | --- | --- |
+| 🚫 | TD-19 | SQLite 已验证；PostgreSQL 支持非当前镜像交付目标 | 个人使用场景以 SQLite 为准，PG 驱动/Compose/迁移未纳入当前发行范围；不继续追踪 | 2026-11-10 |
 | 🚫 | TD-28 | MANIFEST 审计边界 | 经评估，现有打包校验已覆盖该风险面；无新增攻击面证据，暂不实施。后续出现包完整性告警再重启。 | 2026-11-01 |
 | 🚫 | TD-30 | UI 品牌词 | 纯文案项，无安全/稳定性影响；纳入品牌统一化专项，不从技术债口径统计。 | 2026-11-01 |
 
@@ -70,7 +69,7 @@
 
 ### v1.0.7 技术债核对结论（2026-11-01）
 
-- 已完成：**31 项**；待清零：**1 项**；已关闭：**2 项**（总数 34）。
+- 已完成：**31 项**；待清零：**0 项**；已关闭：**3 项**（总数 34）。
 - 差异说明：`TECH_DEBT_CLEARANCE_PLAN.md` 记录 RC6-TD-01~20 已全部清零，但本次核对确认
   TD-18（CI 缺 import-linter）与 TD-19（`backend/app/models.py` 仍保留废弃的
   `execution_logs.output` 字段）不标为已完成。
@@ -102,15 +101,15 @@
 - TD-32（待登记，不计入当前 32 项口径）：`release_baseline.json` 按域拆分为
   pytest/openapi/mypy/lockfile 多文件，避免再次跨主题冲突。
 
-## TD-19 Partial 记录
+## TD-19 Ignored 记录
 
 - 2026-11-09：SQLite 路径完成旧 `execution_logs.output` 回填到 `ring_logs`
-  （ref_type=execution），重建表并删除列；迁移测试覆盖回填与列删除。
-- PostgreSQL 路径代码已实现，但当前环境无真实 PG 实例，未完成 PG 验证与回滚演练。
-  TD-19 保持 ⬜ Partial，不标记完成。
-- 读取侧已移除 legacy fallback；`_LogSnapshot.legacy_output` 保留为空兼容字段。
-- 回填使用 started_at 的真实 epoch；同步失败/路由复用/版本接口阻塞问题已修复。
-- 修复 SQLite PRAGMA 时序：在 AUTOCOMMIT 连接先关闭 `foreign_keys`，再显式 `BEGIN`/`COMMIT` 执行重建，结束后恢复；`foreign_key_check` 与索引校验在事务内。
+  （ref_type=execution），重建表并删除列；迁移测试覆盖回填、列删除、索引与外键检查。
+- 修复 SQLite PRAGMA 时序：AUTOCOMMIT 连接关闭 `foreign_keys`，显式事务执行重建，结束后恢复；
+  回填使用 `started_at` 的真实 epoch。
+- PostgreSQL 路径代码已实现，但当前镜像不含 PG 驱动/Compose/迁移支持；经确认 PostgreSQL
+  不属于当前交付范围，TD-19 标记为 Ignored。读取侧已移除 legacy fallback。
+- `_LogSnapshot.legacy_output` 保留为空兼容字段，不再读取旧列。
 
 ## TD-34 完成记录
 
@@ -167,8 +166,8 @@
 
 ## TD-19a 记录
 
-- 2026-11-01：TD-19a 完成「停止新写入 + 保留旧读取 fallback」；`execution_logs.output` 列与 API 兼容保留，删列/回填留待 TD-19b（v1.0.8/v2.0）。TD-19 整体仍为 ⬜，不计入完成数。
-- ring 写入失败时不再回写 output，而是在 `message` 加警告并写 error 日志；旧行 fallback 仍可读。
+- 2026-11-01：TD-19a 完成「停止新写入 + 保留旧读取 fallback」；后续 TD-19b 已在 SQLite 上完成回填与删列。
+- ring 写入失败时不再回写 output，而是在 `message` 加警告并写 error 日志；旧列已由 TD-19 迁移删除。
 
 ## TD-27/TD-29 验收记录
 
@@ -253,7 +252,7 @@ v1.0.7 第一周必须完成以下评估并给出排期：
 
 ```text
 已完成标记数：31
-待清零标记数：1
+待清零标记数：0
 修改文件：docs/TECH_DEBT.md
 未修改：任何源码、测试、Releases/v1.0.6/
 ```
