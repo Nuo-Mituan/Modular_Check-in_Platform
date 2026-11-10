@@ -45,6 +45,7 @@ secret-config.json
 .env.local
 modules/*
 down/*
+tools/
 backend/observability/
 pyproject.toml
 pytest.ini
