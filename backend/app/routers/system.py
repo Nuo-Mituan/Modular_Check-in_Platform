@@ -28,6 +28,7 @@ from ..schemas import (
     VersionInfoOut,
     ChromeSettingsOut,
     ChromeSettingsUpdate,
+    ChromeSettingsUpdateOut,
 )
 from ..scheduling import CYCLE_LABELS, REPEAT_CYCLES
 from ..services.maintenance import purge_old_logs
@@ -35,7 +36,7 @@ from ..services.ring_log import ring_log
 from ..services.push_outbox import pending_count as outbox_pending_count
 from ..services.auth_sessions import invalidate_all_sessions
 from ..services.preferences import set_developer_mode
-from ..services.chrome_sync import get_global_chrome_version, set_global_chrome_version
+from ..services.chrome_sync import chrome_sync_lock, get_global_chrome_version, set_global_chrome_version
 from ..services.hub import hub
 from ..services.scheduler import scheduler_service
 from ..timeutils import utcnow
@@ -135,16 +136,24 @@ async def get_chrome_settings(db: AsyncSession = Depends(get_db)) -> ChromeSetti
     return ChromeSettingsOut(chrome_major_version=await get_global_chrome_version(db))
 
 
-@settings_router.put("/chrome", response_model=ChromeSettingsOut, summary="保存全局 Chrome 版本")
+@settings_router.put("/chrome", response_model=ChromeSettingsUpdateOut, summary="保存全局 Chrome 版本")
 async def update_chrome_settings(
-    payload: ChromeSettingsUpdate, db: AsyncSession = Depends(get_db)
-) -> ChromeSettingsOut:
+    payload: ChromeSettingsUpdate, response: Response, db: AsyncSession = Depends(get_db)
+) -> ChromeSettingsUpdateOut:
     try:
-        version, _ = await set_global_chrome_version(db, payload.chrome_major_version)
+        async with chrome_sync_lock:
+            version, changed, failed = await set_global_chrome_version(db, payload.chrome_major_version)
+            await db.commit()
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    await db.commit()
-    return ChromeSettingsOut(chrome_major_version=version)
+    if failed:
+        response.status_code = 207
+    return ChromeSettingsUpdateOut(
+        chrome_major_version=version,
+        synced_count=changed,
+        expected_count=changed + len(failed),
+        failed_module_ids=failed,
+    )
 
 
 @settings_router.get("/logs", response_model=LogSettingsOut, summary="读取日志保留设置")

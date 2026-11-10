@@ -128,6 +128,7 @@
                 :supported="supportsChromeSync"
                 @version="setModuleChromeVersion"
                 @update:enabled="chromeSyncEnabled = $event"
+                @sync-error="handleChromeSyncError"
               />
               <div class="panel-head">
                 <div>
@@ -522,6 +523,10 @@ const timezone = computed(() => appStore.meta?.timezone || 'Asia/Shanghai')
 const requiredCount = computed(
   () => (module.value?.param_schema || []).filter((item) => item.required).length,
 )
+function handleChromeSyncError(message) {
+  ElMessage.warning(message || 'Chrome 同步失败')
+}
+
 function setModuleChromeVersion(value) {
   const next = Number(value)
   if (!Number.isInteger(next) || next < 1 || next > 999) return

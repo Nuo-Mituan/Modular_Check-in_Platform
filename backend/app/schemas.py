@@ -451,6 +451,12 @@ class ChromeSettingsUpdate(BaseModel):
     chrome_major_version: int
 
 
+class ChromeSettingsUpdateOut(ChromeSettingsOut):
+    synced_count: int = 0
+    expected_count: int = 0
+    failed_module_ids: list[int] = Field(default_factory=list)
+
+
 class ChromeSyncOut(BaseModel):
     supported: bool
     enabled: bool

@@ -81,7 +81,7 @@ from ..security import verify_password
 from ..services import execution
 from ..services.auth_guard import lock_for_user, sensitive_limiter
 from ..services.ownership import owner_user_id
-from ..services.chrome_sync import ChromeSyncError, get_module_sync, module_supports_chrome, set_module_sync
+from ..services.chrome_sync import ChromeSyncError, chrome_sync_lock, get_module_sync, module_supports_chrome, set_module_sync
 from ..services.module_update import (
     ModuleUpdateError,
     ModuleUpdateHooks,
@@ -960,10 +960,11 @@ async def update_chrome_sync(
     if not await module_supports_chrome(module):
         raise HTTPException(status_code=400, detail="该模块不支持自定义 Chrome 版本")
     try:
-        data = await set_module_sync(db, module, payload.enabled)
+        async with chrome_sync_lock:
+            data = await set_module_sync(db, module, payload.enabled)
+            await db.commit()
     except ChromeSyncError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    await db.commit()
     return ChromeSyncOut(**data)
 
 

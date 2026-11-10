@@ -718,7 +718,14 @@ async function testPush() {
 
 async function saveChromeVersion() {
   try {
-    chromeVersion.value = await chromeStore.update(chromeVersion.value)
+    const result = await chromeStore.update(chromeVersion.value)
+    chromeVersion.value = Number(result.chrome_major_version)
+    if (result.failed_module_ids?.length) {
+      ElMessage.warning(
+        `Chrome 版本已保存，但 ${result.failed_module_ids.length} 个模块同步失败，请检查模块参数`,
+      )
+      return
+    }
     ElMessage.success('Chrome 版本已保存，已开启同步的模块会自动更新')
   } catch (error) {
     ElMessage.warning(error?.message || 'Chrome 版本保存失败')

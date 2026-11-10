@@ -31,7 +31,7 @@ const props = defineProps({
   moduleId: { type: Number, required: true },
   supported: { type: Boolean, default: false },
 })
-const emit = defineEmits(['version', 'update:enabled'])
+const emit = defineEmits(['version', 'update:enabled', 'sync-error'])
 const chrome = useChromeStore()
 const enabled = ref(false)
 const loading = ref(false)
@@ -75,9 +75,14 @@ watch(
     try {
       const detail = await modulesApi.get(props.moduleId)
       const value = detail?.params?.chrome_version
-      if (value != null) emit('version', Number(value))
+      if (value != null) {
+        emit('version', Number(value))
+        if (Number(value) !== Number(chrome.chromeMajorVersion)) {
+          emit('sync-error', '模块 Chrome 版本与全局值不一致，请检查同步状态')
+        }
+      }
     } catch {
-      // Keep the last known value; the HTTP layer already surfaced the error.
+      emit('sync-error', '读取 Chrome 同步状态失败，请重试')
     }
   },
 )

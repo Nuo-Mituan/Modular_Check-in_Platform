@@ -55,3 +55,10 @@
 - ModuleChromeSync 监听 moduleId 变化，避免路由复用导致状态串模块。
 - /api/version 的 git_commit 解析移到 asyncio.to_thread，并缓存结果。
 - valid_chrome_version 拒绝浮点数与布尔值。
+
+
+## 并发与同步反馈修复
+
+- 全局 Chrome 版本保存返回 synced_count/expected_count/failed_module_ids；存在失败时 HTTP 207，前端提示部分模块同步失败。
+- Chrome 同步读改写增加进程内 asyncio 锁，避免同一进程并发保存互相覆盖。
+- ModuleChromeSync 在全局值与模块值不一致或读取失败时向父页面发出警告。

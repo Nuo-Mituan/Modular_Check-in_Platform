@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 
@@ -14,6 +15,10 @@ from ..models import AppSetting, Module
 from .ownership import owner_user_id
 
 logger = logging.getLogger(__name__)
+# Serializes the read-modify-write of encrypted module params within this
+# process. SQLite deployments run one application process; PostgreSQL would
+# need SELECT ... FOR UPDATE or an optimistic version column instead.
+chrome_sync_lock = asyncio.Lock()
 GLOBAL_KEY = "chrome_major_version"
 DEFAULT_CHROME_VERSION = 156
 MIN_CHROME_VERSION = 1
@@ -130,7 +135,7 @@ async def get_module_sync(db: AsyncSession, module: Module) -> ChromeSyncData:
     )
 
 
-async def set_global_chrome_version(db: AsyncSession, value: object) -> tuple[int, int]:
+async def set_global_chrome_version(db: AsyncSession, value: object) -> tuple[int, int, list[int]]:
     version = valid_chrome_version(value)
     await _set_setting(db, GLOBAL_KEY, str(version))
     # One settings query + one modules query; avoid per-module lookups.
@@ -148,15 +153,17 @@ async def set_global_chrome_version(db: AsyncSession, value: object) -> tuple[in
         except (IndexError, ValueError):
             continue
     if not enabled_ids:
-        return version, 0
+        return version, 0, []
     modules = (
         await db.execute(select(Module).where(Module.id.in_(enabled_ids)))
     ).scalars().all()
     user_id = await owner_user_id(db)
     changed = 0
+    failed: list[int] = []
     for module in modules:
         if await _write_module_version(db, module, version, user_id=user_id):
             changed += 1
         else:
+            failed.append(module.id)
             logger.warning("全局 Chrome 版本同步跳过模块 id=%s（参数不可写）", module.id)
-    return version, changed
+    return version, changed, failed

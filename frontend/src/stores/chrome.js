@@ -32,7 +32,7 @@ export const useChromeStore = defineStore('chrome', () => {
     try {
       const data = await systemApi.updateChromeSettings({ chrome_major_version: next })
       chromeMajorVersion.value = normalize(data.chrome_major_version) ?? next
-      return chromeMajorVersion.value
+      return data
     } finally {
       saving.value = false
     }
