@@ -7,7 +7,6 @@
 
 - 用户设置页新增全局 Chrome 主版本号（默认 156，范围 1-999）。
 - 模块详情页新增「同步全局 Chrome 版本」Switch：
-  - 仅 `e-hentai` / `ikuuu_vpn` 支持；
   - 其他模块显示 disabled，tooltip 说明不支持；
   - 开启时后端立即把全局值写入模块 `params.chrome_version` 并保存；
   - 全局值更新时，后端自动更新所有已开启同步的模块；
