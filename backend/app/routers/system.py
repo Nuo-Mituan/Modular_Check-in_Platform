@@ -136,7 +136,12 @@ async def get_chrome_settings(db: AsyncSession = Depends(get_db)) -> ChromeSetti
     return ChromeSettingsOut(chrome_major_version=await get_global_chrome_version(db))
 
 
-@settings_router.put("/chrome", response_model=ChromeSettingsUpdateOut, summary="保存全局 Chrome 版本")
+@settings_router.put(
+    "/chrome",
+    response_model=ChromeSettingsUpdateOut,
+    responses={207: {"model": ChromeSettingsUpdateOut, "description": "部分模块同步失败"}},
+    summary="保存全局 Chrome 版本",
+)
 async def update_chrome_settings(
     payload: ChromeSettingsUpdate, response: Response, db: AsyncSession = Depends(get_db)
 ) -> ChromeSettingsUpdateOut:

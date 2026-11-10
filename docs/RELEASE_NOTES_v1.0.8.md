@@ -1,7 +1,7 @@
-# v1.0.8 变更说明（草案）
+# v1.0.8 变更说明
 
-- 版本：`1.0.8`（开发中）
-- 状态：开发/验证中
+- 版本：`1.0.8`
+- 状态：**已发布**（2026-11-10）
 
 ## Chrome 版本同步
 
@@ -20,10 +20,23 @@
 - `docs/V1.0.8_CHROME_SYNC.md`
 - `docs/MODULE_DEVELOPMENT.md` Chrome 接入指南
 
+## 验证摘要
+
+- 后端：296 passed / 1 failed（既有白名单 `test_noop_batch_restores_outbox_audit`）
+- mypy：0 errors
+- OpenAPI：paths=43 / breaking=0
+- 前端：42 passed（Node 37 + 组件 5）
+- 构建：exit 0，产物无 `dev`
+- Snapshot：236 files / `shasum` OK=237 / FAIL=0 / checklist 23/23
+
 ## 已知边界
 
 - `trae` / `ehtag_data` 保持固定 UA，不参与 Chrome 同步。
 - 仅单账号模块支持同步；多账号模块当前不提供该能力。
+- `asyncio.Lock` 仅单进程有效；多 worker/PG 需要行锁或乐观锁。
+- `sync-error` 事件缺少专门自动化测试。
+- TD-35：Chrome 同步尚未复用完整模块参数保存/校验编排。
+- PostgreSQL 路径不在当前镜像交付范围（TD-19 Ignored）。
 
 
 ## 技术债清除
@@ -62,3 +75,8 @@
 - 全局 Chrome 版本保存返回 synced_count/expected_count/failed_module_ids；存在失败时 HTTP 207，前端提示部分模块同步失败。
 - Chrome 同步读改写增加进程内 asyncio 锁，避免同一进程并发保存互相覆盖。
 - ModuleChromeSync 在全局值与模块值不一致或读取失败时向父页面发出警告。
+
+
+## 已知技术债
+
+- TD-35：Chrome 同步直接写 `params_encrypted`，尚未复用完整模块参数校验/合并编排；当前只写已校验的 chrome_version，不阻塞发布。

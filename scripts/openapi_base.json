@@ -181,6 +181,36 @@
         "title": "ChromeSettingsUpdate",
         "type": "object"
       },
+      "ChromeSettingsUpdateOut": {
+        "properties": {
+          "chrome_major_version": {
+            "title": "Chrome Major Version",
+            "type": "integer"
+          },
+          "expected_count": {
+            "default": 0,
+            "title": "Expected Count",
+            "type": "integer"
+          },
+          "failed_module_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Failed Module Ids",
+            "type": "array"
+          },
+          "synced_count": {
+            "default": 0,
+            "title": "Synced Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chrome_major_version"
+        ],
+        "title": "ChromeSettingsUpdateOut",
+        "type": "object"
+      },
       "ChromeSyncOut": {
         "properties": {
           "chrome_version": {
@@ -4748,11 +4778,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ChromeSettingsOut"
+                  "$ref": "#/components/schemas/ChromeSettingsUpdateOut"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "207": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChromeSettingsUpdateOut"
+                }
+              }
+            },
+            "description": "部分模块同步失败"
           },
           "422": {
             "content": {

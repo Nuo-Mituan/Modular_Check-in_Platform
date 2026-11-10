@@ -2,7 +2,7 @@
 
 - 版本：`1.0.6`
 - 发布日期：2026-10-31
-- 状态：已封板；本文件为 `docs` 目录下的版本变更说明。
+- 状态：已发布；本文件为 `docs` 目录下的版本变更说明。
 - 发布归档：[Releases/v1.0.6/RELEASE_NOTES.md](../Releases/v1.0.6/RELEASE_NOTES.md)
 
 v1.0.6 是自 v1.0.3 以来的累积快照，主题为模块图标契约，同时包含 observability、
