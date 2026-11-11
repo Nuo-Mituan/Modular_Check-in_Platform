@@ -20,7 +20,7 @@ FROM python:3.11-slim AS runtime
 
 LABEL org.opencontainers.image.title="Modular Check-in Platform" \
       org.opencontainers.image.description="Self-hosted daily check-in platform with hot-pluggable modules" \
-      org.opencontainers.image.version="1.0.8"
+      org.opencontainers.image.version="1.0.9"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

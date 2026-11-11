@@ -1,13 +1,14 @@
 # 签到云台 · Modular Check-in Platform
 
-> ## v1.0.8
+> ## v1.0.9 开发中
 >
-> v1.0.8 新增 Chrome 主版本号全局设置与模块级同步：全局值持久化在
+> v1.0.9 新增手动执行不推送；v1.0.8 引入 Chrome 主版本号全局设置与模块级同步：全局值持久化在
 > `app_settings`，模块 UA 仍只读取自身 `params.chrome_version`；开关仅授权
 > “全局修改时覆盖写入模块参数”，关闭不会回滚模块值。
 >
 > - Chrome 同步说明：[docs/V1.0.8_CHROME_SYNC.md](docs/V1.0.8_CHROME_SYNC.md)
 > - v1.0.8 变更说明：[docs/RELEASE_NOTES_v1.0.8.md](docs/RELEASE_NOTES_v1.0.8.md)
+> - v1.0.9 变更说明：[docs/RELEASE_NOTES_v1.0.9.md](docs/RELEASE_NOTES_v1.0.9.md)
 > - 发布与变更管制：[docs/RELEASE_POLICY.md](docs/RELEASE_POLICY.md)
 > - Docker 验证 SOP：[docs/DOCKER_GATE_SOP.md](docs/DOCKER_GATE_SOP.md)
 > - 统一推送：[docs/UNIFIED_PUSH.md](docs/UNIFIED_PUSH.md)

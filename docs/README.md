@@ -35,5 +35,6 @@
 - [v1.0.5 变更说明](RELEASE_NOTES_v1.0.5.md)
 - [v1.0.6 变更说明](RELEASE_NOTES_v1.0.6.md)
 - [v1.0.7 变更说明（草案）](RELEASE_NOTES_v1.0.7.md)
-- [v1.0.8 变更说明（草案）](RELEASE_NOTES_v1.0.8.md)
+- [v1.0.8 变更说明](RELEASE_NOTES_v1.0.8.md)
+- [v1.0.9 变更说明](RELEASE_NOTES_v1.0.9.md)
 - [技术债清单](TECH_DEBT.md)

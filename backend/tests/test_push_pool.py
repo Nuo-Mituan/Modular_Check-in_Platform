@@ -13,6 +13,7 @@ from app.config import settings
 from app.database import SessionLocal, init_db
 from app.models import Module, PushBatch, PushPool, PushRecord
 from app.services import push_delivery, push_pool
+from app.services.bootstrap import seed_admin
 
 
 def _module(
@@ -190,7 +191,7 @@ async def test_flush_clears_pool_idempotent_and_manual_after_flush(fast_retries)
     # Idempotent: no second summary.
     assert await push_pool.flush_batch(cycle) is False
     assert len(fast_retries) == 1
-    # Manual execution after flush => one supplement record, no new pool row.
+    # Manual execution must not send a post-flush supplement.
     await push_pool.record_unified_result(
         module_id,
         status="success",
@@ -199,7 +200,7 @@ async def test_flush_clears_pool_idempotent_and_manual_after_flush(fast_retries)
         trigger="manual",
         cycle_id=cycle,
     )
-    assert len(fast_retries) == 2
+    assert len(fast_retries) == 1
     async with SessionLocal() as db:
         supplements = (
             (
@@ -213,11 +214,7 @@ async def test_flush_clears_pool_idempotent_and_manual_after_flush(fast_retries)
             .scalars()
             .all()
         )
-        assert len(supplements) == 1
-        pool_count = await db.scalar(
-            select(func.count()).select_from(PushPool).where(PushPool.cycle_id == cycle)
-        )
-    assert pool_count == 0
+        assert supplements == []
 
 
 @pytest.mark.asyncio
@@ -249,8 +246,7 @@ async def test_skip_manual_override_and_skip_notice(fast_retries) -> None:
         assert skipped.name not in (batch.summary or "")
         assert executed.name in (batch.summary or "")
     assert len(fast_retries) == 1
-    # Now a manual override of the skipped module still produces a supplement
-    # only after a flushed batch, not a second batch summary.
+    # Manual override must not produce a supplement or another summary.
     await push_pool.record_unified_result(
         skipped_id,
         status="success",
@@ -259,7 +255,7 @@ async def test_skip_manual_override_and_skip_notice(fast_retries) -> None:
         trigger="manual",
         cycle_id=cycle,
     )
-    assert len(fast_retries) == 2
+    assert len(fast_retries) == 1
 
 
 @pytest.mark.asyncio
@@ -525,8 +521,8 @@ async def test_concurrent_retention_flush_and_supplement_no_deadlock(fast_retrie
                 .scalars()
                 .all()
             )
-            assert len(supplements) == 1, "flush 后补发应恰好一条"
-        assert len(fast_retries) == 2
+            assert supplements == []
+        assert len(fast_retries) == 1
     finally:
         ring_log.set_retention_days(old_days)
 
@@ -848,6 +844,7 @@ async def test_expired_batch_manual_late_result_never_supplements(monkeypatch) -
 @pytest.mark.asyncio
 async def test_direct_flush_rejects_expired_batch() -> None:
     await init_db()
+    await seed_admin()
     await _disable_pool_modules()
     cycle = "2026-12-08"
     module = _module(cycle="daily")
@@ -893,6 +890,7 @@ async def test_cross_day_pending_batches_are_terminalized() -> None:
     await _disable_pool_modules()
     from sqlalchemy import delete
     async with SessionLocal() as db:
+        await db.execute(delete(PushPool))
         await db.execute(delete(PushBatch))
         await db.commit()
     today = datetime.now(settings.timezone_info).date()

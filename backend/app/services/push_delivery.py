@@ -227,8 +227,10 @@ async def _supplement_after_flush(
     status: str,
     message: str,
 ) -> None:
-    """Send a single post-flush supplement for manual executions only."""
-    if trigger == "manual" and settings.push_after_flush_mode == "single":
+    """Manual executions are deliberately excluded from all push paths."""
+    if trigger != "schedule":
+        return
+    if settings.push_after_flush_mode == "single":
         await _send_supplement(
             module_id, module_key, module_name, cycle_id, status, message
         )

@@ -619,6 +619,10 @@ def _push_payload(outcome: ExecutionOutcome) -> dict[str, object]:
 async def _send_execution_notification(
     module_id: int, outcome: ExecutionOutcome, duration_ms: int, trigger: str
 ) -> None:
+    # Manual "run now" is intentionally silent: only scheduled executions
+    # may contribute to unified batches or send independent notifications.
+    if trigger == TRIGGER_MANUAL:
+        return
     payload = {
         key: redact_text(value) for key, value in _push_payload(outcome).items()
     }
