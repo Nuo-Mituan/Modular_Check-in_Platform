@@ -1879,6 +1879,8 @@ def test_pool_events_partial_registration(monkeypatch) -> None:
     # Only verify isolation of the registration loop, without touching the
     # already-registered production listeners.
     monkeypatch.setattr(loader, "_POOL_EVENTS_REGISTERED", False)
+    monkeypatch.setattr(loader, "_POOL_EVENTS_FULLY_REGISTERED", False)
+    monkeypatch.setattr(loader, "_REGISTERED_POOL_ID", None)
     monkeypatch.setattr(loader, "_REGISTERED_POOL_EVENT_KEYS", set())
     monkeypatch.setattr(loader.sa_event, "listens_for", lambda pool, name: Registrar(pool, name))
     monkeypatch.setattr(loader.sa_event, "contains", lambda pool, name, listener: False)
@@ -2058,27 +2060,25 @@ def test_decay_state_writable_exposed_in_stats(monkeypatch) -> None:
     assert loader.get_stripe_contention_stats()["decay_state_writable"] is False
 
 
-def test_pool_partial_registration_retries(monkeypatch) -> None:
+def test_pool_unsupported_events_are_skipped(monkeypatch) -> None:
     import app.module_loader as loader
     attempted = []
-    state = {"fail": True}
     class Registrar:
         def __init__(self, pool, name):
             self.name = name
         def __call__(self, listener):
             attempted.append(self.name)
-            if self.name == "error" and state["fail"]:
-                raise RuntimeError("unsupported")
             return listener
     monkeypatch.setattr(loader, "_POOL_EVENTS_REGISTERED", False)
     monkeypatch.setattr(loader, "_POOL_EVENTS_FULLY_REGISTERED", False)
+    monkeypatch.setattr(loader, "_REGISTERED_POOL_ID", None)
     monkeypatch.setattr(loader, "_REGISTERED_POOL_EVENT_KEYS", set())
     monkeypatch.setattr(loader.sa_event, "listens_for", lambda pool, name: Registrar(pool, name))
     loader._register_pool_events()
-    assert loader._POOL_EVENTS_FULLY_REGISTERED is False
-    state["fail"] = False
-    loader._register_pool_events()
-    assert "error" in attempted
+    # NullPool does not expose disconnect/error; they must not be retried forever.
+    assert loader._POOL_EVENTS_FULLY_REGISTERED is True
+    assert "error" not in attempted
+    assert "disconnect" not in attempted
 
 
 def test_decay_state_writable_persisted_across_restart(tmp_path, monkeypatch) -> None:

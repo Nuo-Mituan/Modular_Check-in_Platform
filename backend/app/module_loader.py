@@ -1019,6 +1019,12 @@ def _register_pool_events_locked() -> None:
         key = (current_pool_id, event_name)
         if key in _REGISTERED_POOL_EVENT_KEYS:
             continue
+        # NullPool (aiosqlite default) has no disconnect/error events. Treat
+        # unsupported events as intentionally skipped instead of retrying and
+        # emitting a traceback on every metrics refresh.
+        if not hasattr(pool.dispatch, event_name):
+            _REGISTERED_POOL_EVENT_KEYS.add(key)
+            continue
         try:
             sa_event.listens_for(pool, event_name)(listener)
             _REGISTERED_POOL_EVENT_KEYS.add(key)
