@@ -444,3 +444,21 @@ def test_chrome_sync_validator_rejects_float() -> None:
     for value in (0, 1000, True, False, None, "", 1.5, "1.5", "abc", "１２３"):
         with pytest.raises(ValueError):
             valid_chrome_version(value)
+
+
+def test_chrome_sync_uses_module_param_validation() -> None:
+    from app.models import Module
+    from app.services.module_params import validate_module_params
+
+    module = Module(
+        key="chrome-params",
+        name="Chrome params",
+        param_schema=[
+            {"key": "chrome_version", "label": "Chrome 主版本号", "type": "number"}
+        ],
+    )
+    assert validate_module_params(module, {"chrome_version": 1})["chrome_version"] == 1
+    with pytest.raises(ModuleConfigError):
+        validate_module_params(module, {"chrome_version": 0})
+    with pytest.raises(ModuleConfigError):
+        validate_module_params(module, {"chrome_version": 1.5})

@@ -16,9 +16,15 @@
 
 - 后端：pytest 通过（手动执行推送相关用例已按新行为调整）
 - 前端：构建通过
-- TD-35 等已知边界沿用 v1.0.8 记录。
+- TD-35 已完成：Chrome 同步写入复用统一模块参数校验。
 
 
 ## 运行时告警修复
 
 - SQLite 默认使用 NullPool；不再尝试注册不存在的 `disconnect`/`error` 连接池事件，避免每次指标刷新输出 traceback。
+
+## TD-35
+
+- Chrome 同步参数写入前执行 `validate_and_normalize_params`，非法参数返回 409。
+
+- Chrome 同步参数校验失败返回 422；解密/状态写入失败返回 409。

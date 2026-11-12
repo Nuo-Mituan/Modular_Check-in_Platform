@@ -16,7 +16,7 @@
 > **Batch 3 状态（2026-10-20）**：TD-06 / TD-13 / TD-14 / TD-16 / TD-20 已完成。
 > 环形日志改为单写线程 + 有界队列；SSE 指标/重连滞后可查询；心跳可配置；新增只读系统日志页。
 
-### 已完成（31）
+### 已完成（32）
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -51,12 +51,11 @@
 | ✅ | TD-33 | P3 | `backend/app/core/metrics.py` | import-linter 的 2 条 metrics 懒加载例外长期存在 | 门禁存在永久例外 | 抽离 provider 注册表到 core，移除 ignore_imports | 平台维护者 |
 | ✅ | TD-23b | P1 | Releases/CI | release checklist --json + snapshot 前置 gate | 清单未机器化，manifest 无法证明 gate 已通过 | checklist 输出 JSON；snapshot 在 gate 通过后生成 manifest；provenance 写入 MANIFEST | 发布负责人 |
 | ✅ | TD-34 | P3 | `frontend/package-lock.json` / CI | npm audit 剩余 3 个 moderate（glob/js-beautify/editorconfig）；CI 未设 audit gate | 未来若把 audit 设为闸门会突然变红 | 先登记 known moderate；优先升级上游，必要时 overrides 并留 provenance | 前端维护者 |
+| ✅ | TD-35 | P3 | `backend/app/services/chrome_sync.py` / `module_params.py` | Chrome 同步参数写入已复用统一校验器 | 保存路径分叉风险已收敛 | 已抽出 `validate_module_params`，Chrome 同步写入前执行同一校验 | 平台维护者 |
 
-### 待清零（1）
+### 待清零（0）
 
-| 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| ⬜ | TD-35 | P3 | `backend/app/services/chrome_sync.py:79-86` | Chrome 同步直接改写 `params_encrypted`，绕过 `module_update` 的统一校验/敏感合并编排 | 字段约束增加后可能出现保存路径分叉；当前仅写已校验的 chrome_version，风险有限 | 抽取统一模块参数写入 service，让手动保存与 Chrome 同步共用校验、合并、加密流程 | 平台维护者 |
+无。
 
 ### 已关闭（3）
 
@@ -71,7 +70,7 @@
 
 ### v1.0.7 技术债核对结论（2026-11-01）
 
-- 已完成：**31 项**；待清零：**1 项**；已关闭：**3 项**（总数 35）。
+- 已完成：**32 项**；待清零：**0 项**；已关闭：**3 项**（总数 35）。
 - 差异说明：`TECH_DEBT_CLEARANCE_PLAN.md` 记录 RC6-TD-01~20 已全部清零，但本次核对确认
   TD-18（CI 缺 import-linter）与 TD-19（`backend/app/models.py` 仍保留废弃的
   `execution_logs.output` 字段）不标为已完成。
@@ -103,7 +102,11 @@
 - TD-32（待登记，不计入当前 32 项口径）：`release_baseline.json` 按域拆分为
   pytest/openapi/mypy/lockfile 多文件，避免再次跨主题冲突。
 
-## TD-35 记录
+## TD-35 完成记录
+
+- 2026-11-12：新增 `app/services/module_params.py` 的 `validate_module_params`；
+  Chrome 同步写入前使用与模块保存相同的 `validate_and_normalize_params`，
+  校验失败返回 409，不再直接加密任意参数。
 
 - 2026-11-10：登记 Chrome 同步绕过统一模块参数编排的问题，见
   `_write_module_version`。当前仅写已校验的 chrome_version，暂不阻塞 v1.0.8；
@@ -259,8 +262,8 @@ v1.0.7 第一周必须完成以下评估并给出排期：
 ## 自检数据
 
 ```text
-已完成标记数：31
-待清零标记数：1
+已完成标记数：32
+待清零标记数：0
 修改文件：docs/TECH_DEBT.md
 未修改：任何源码、测试、Releases/v1.0.6/
 ```

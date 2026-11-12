@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..contracts import ChromeSyncData
 from ..crypto import EncryptionContext, parameter_cipher
 from ..models import AppSetting, Module
+from .module_params import validate_module_params
 from .ownership import owner_user_id
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,10 @@ def _sync_key(module_id: int) -> str:
 
 class ChromeSyncError(ValueError):
     """Chrome sync could not update the module's persisted parameters."""
+
+
+class ChromeSyncValidationError(ChromeSyncError):
+    """The merged module params failed schema validation."""
 
 
 def valid_chrome_version(value: object) -> int:
@@ -98,7 +103,12 @@ async def _write_module_version(
         except Exception:
             return False
     params["chrome_version"] = version
-    module.params_encrypted = parameter_cipher.encrypt(params, context)
+    try:
+        normalized = validate_module_params(module, params)
+    except Exception as exc:
+        logger.warning("Chrome 同步参数校验失败 module=%s: %s", module.id, exc)
+        raise ChromeSyncValidationError(str(exc)) from exc
+    module.params_encrypted = parameter_cipher.encrypt(normalized, context)
     return True
 
 
@@ -161,7 +171,12 @@ async def set_global_chrome_version(db: AsyncSession, value: object) -> tuple[in
     changed = 0
     failed: list[int] = []
     for module in modules:
-        if await _write_module_version(db, module, version, user_id=user_id):
+        try:
+            wrote = await _write_module_version(db, module, version, user_id=user_id)
+        except ChromeSyncValidationError as exc:
+            wrote = False
+            logger.warning("全局 Chrome 版本同步参数校验失败 module=%s: %s", module.id, exc)
+        if wrote:
             changed += 1
         else:
             failed.append(module.id)

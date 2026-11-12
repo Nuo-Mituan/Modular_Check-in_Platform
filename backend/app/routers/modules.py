@@ -81,7 +81,7 @@ from ..security import verify_password
 from ..services import execution
 from ..services.auth_guard import lock_for_user, sensitive_limiter
 from ..services.ownership import owner_user_id
-from ..services.chrome_sync import ChromeSyncError, chrome_sync_lock, get_module_sync, module_supports_chrome, set_module_sync
+from ..services.chrome_sync import ChromeSyncError, ChromeSyncValidationError, chrome_sync_lock, get_module_sync, module_supports_chrome, set_module_sync
 from ..services.module_update import (
     ModuleUpdateError,
     ModuleUpdateHooks,
@@ -963,6 +963,8 @@ async def update_chrome_sync(
         async with chrome_sync_lock:
             data = await set_module_sync(db, module, payload.enabled)
             await db.commit()
+    except ChromeSyncValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ChromeSyncError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return ChromeSyncOut(**data)
