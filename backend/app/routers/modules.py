@@ -81,7 +81,7 @@ from ..security import verify_password
 from ..services import execution
 from ..services.auth_guard import lock_for_user, sensitive_limiter
 from ..services.ownership import owner_user_id
-from ..services.chrome_sync import ChromeSyncError, ChromeSyncValidationError, chrome_sync_lock, get_module_sync, module_supports_chrome, set_module_sync
+from ..services.chrome_sync import ChromeSyncCorruptError, ChromeSyncError, ChromeSyncValidationError, chrome_sync_lock, get_module_sync, module_supports_chrome, set_module_sync
 from ..services.module_update import (
     ModuleUpdateError,
     ModuleUpdateHooks,
@@ -945,10 +945,18 @@ async def reveal_sensitive(
         )
 
 
-@router.get("/{module_id}/chrome-sync", response_model=ChromeSyncOut, summary="读取模块 Chrome 同步状态")
+@router.get(
+    "/{module_id}/chrome-sync",
+    response_model=ChromeSyncOut,
+    responses={409: {"description": "模块参数损坏或无法解密"}},
+    summary="读取模块 Chrome 同步状态",
+)
 async def get_chrome_sync(module_id: int, db: AsyncSession = Depends(get_db)) -> ChromeSyncOut:
     module = await _get_module_or_404(db, module_id)
-    data = await get_module_sync(db, module)
+    try:
+        data = await get_module_sync(db, module)
+    except ChromeSyncCorruptError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return ChromeSyncOut(**data)
 
 

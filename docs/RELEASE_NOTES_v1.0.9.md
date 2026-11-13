@@ -28,3 +28,10 @@
 - Chrome 同步参数写入前执行 `validate_and_normalize_params`，非法参数返回 409。
 
 - Chrome 同步参数校验失败返回 422；解密/状态写入失败返回 409。
+
+## Chrome 同步健壮性修复
+
+- 模块 Chrome 参数解密失败或 chrome_version 非法时返回 409，不再返回 enabled=true/null 的半有效状态。
+- Chrome 同步校验优先读取实时 config.json，读取失败才回退数据库 param_schema。
+- 全局 Chrome 版本存储损坏时记录 warning，并在设置读取响应中返回 degraded=true。
+- 前端对 sync-error 做 3 秒去重，并提示全局配置损坏状态。

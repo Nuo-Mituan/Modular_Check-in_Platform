@@ -427,6 +427,7 @@
 <script setup>
 import {
   computed,
+  onBeforeUnmount,
   onMounted,
   reactive,
   ref,
@@ -523,9 +524,24 @@ const timezone = computed(() => appStore.meta?.timezone || 'Asia/Shanghai')
 const requiredCount = computed(
   () => (module.value?.param_schema || []).filter((item) => item.required).length,
 )
-function handleChromeSyncError(message) {
-  ElMessage.warning(message || 'Chrome 同步失败')
+const chromeWarningTimers = new Map()
+
+function handleChromeSyncError(payload) {
+  const data = typeof payload === 'string'
+    ? { moduleId: route.params.id, code: 'UNKNOWN', message: payload }
+    : payload
+  const key = `${data.moduleId}:${data.code}`
+  const previous = chromeWarningTimers.get(key)
+  if (previous) clearTimeout(previous)
+  ElMessage.warning(data.message || 'Chrome 同步失败')
+  const timer = setTimeout(() => chromeWarningTimers.delete(key), 3000)
+  chromeWarningTimers.set(key, timer)
 }
+
+onBeforeUnmount(() => {
+  for (const timer of chromeWarningTimers.values()) clearTimeout(timer)
+  chromeWarningTimers.clear()
+})
 
 function setModuleChromeVersion(value) {
   const next = Number(value)

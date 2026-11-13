@@ -36,7 +36,7 @@ from ..services.ring_log import ring_log
 from ..services.push_outbox import pending_count as outbox_pending_count
 from ..services.auth_sessions import invalidate_all_sessions
 from ..services.preferences import set_developer_mode
-from ..services.chrome_sync import chrome_sync_lock, get_global_chrome_version, set_global_chrome_version
+from ..services.chrome_sync import chrome_sync_lock, get_global_chrome_version_with_state, set_global_chrome_version
 from ..services.hub import hub
 from ..services.scheduler import scheduler_service
 from ..timeutils import utcnow
@@ -133,7 +133,8 @@ async def _log_settings() -> LogSettingsOut:
 
 @settings_router.get("/chrome", response_model=ChromeSettingsOut, summary="读取全局 Chrome 版本")
 async def get_chrome_settings(db: AsyncSession = Depends(get_db)) -> ChromeSettingsOut:
-    return ChromeSettingsOut(chrome_major_version=await get_global_chrome_version(db))
+    version, degraded = await get_global_chrome_version_with_state(db)
+    return ChromeSettingsOut(chrome_major_version=version, degraded=degraded)
 
 
 @settings_router.put(

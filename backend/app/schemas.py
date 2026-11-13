@@ -445,6 +445,7 @@ class VersionInfoOut(BaseModel):
 
 class ChromeSettingsOut(BaseModel):
     chrome_major_version: int
+    degraded: bool = False
 
 
 class ChromeSettingsUpdate(BaseModel):

@@ -78,11 +78,19 @@ watch(
       if (value != null) {
         emit('version', Number(value))
         if (Number(value) !== Number(chrome.chromeMajorVersion)) {
-          emit('sync-error', '模块 Chrome 版本与全局值不一致，请检查同步状态')
+          emit('sync-error', {
+            moduleId: props.moduleId,
+            code: 'VERSION_MISMATCH',
+            message: '模块 Chrome 版本与全局值不一致，请检查同步状态',
+          })
         }
       }
     } catch {
-      emit('sync-error', '读取 Chrome 同步状态失败，请重试')
+      emit('sync-error', {
+        moduleId: props.moduleId,
+        code: 'READ_FAILED',
+        message: '读取 Chrome 同步状态失败，请重试',
+      })
     }
   },
 )

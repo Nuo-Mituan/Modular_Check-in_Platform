@@ -38,6 +38,10 @@ class ChromeSyncValidationError(ChromeSyncError):
     """The merged module params failed schema validation."""
 
 
+class ChromeSyncCorruptError(ChromeSyncError):
+    """Persisted module params cannot be decrypted or parsed."""
+
+
 def valid_chrome_version(value: object) -> int:
     if isinstance(value, bool):
         raise ValueError("Chrome 版本必须为整数")
@@ -52,14 +56,23 @@ def valid_chrome_version(value: object) -> int:
     return number
 
 
-async def get_global_chrome_version(db: AsyncSession) -> int:
+async def get_global_chrome_version_with_state(db: AsyncSession) -> tuple[int, bool]:
     row = await db.get(AppSetting, GLOBAL_KEY)
     if row is None:
-        return DEFAULT_CHROME_VERSION
+        return DEFAULT_CHROME_VERSION, False
     try:
-        return valid_chrome_version(row.value)
-    except ValueError:
-        return DEFAULT_CHROME_VERSION
+        return valid_chrome_version(row.value), False
+    except ValueError as exc:
+        logger.warning(
+            "全局 Chrome 版本配置损坏 key=%s raw=%r: %s；使用默认值 %s",
+            GLOBAL_KEY, row.value, exc, DEFAULT_CHROME_VERSION,
+        )
+        return DEFAULT_CHROME_VERSION, True
+
+
+async def get_global_chrome_version(db: AsyncSession) -> int:
+    version, _ = await get_global_chrome_version_with_state(db)
+    return version
 
 
 async def _set_setting(db: AsyncSession, key: str, value: str) -> None:
@@ -133,11 +146,20 @@ async def get_module_sync(db: AsyncSession, module: Module) -> ChromeSyncData:
     if module.params_encrypted:
         try:
             raw = parameter_cipher.decrypt(module.params_encrypted, context)
-            candidate = raw.get("chrome_version")
-            if candidate is not None:
-                version = int(candidate)
-        except (Exception, ValueError):
-            version = None
+        except Exception as exc:
+            logger.error(
+                "模块 Chrome 参数解密失败 module=%s", module.key, exc_info=True
+            )
+            raise ChromeSyncCorruptError("模块参数损坏或无法解密，请重新保存模块配置") from exc
+        candidate = raw.get("chrome_version")
+        if candidate is not None:
+            try:
+                version = valid_chrome_version(candidate)
+            except ValueError as exc:
+                logger.error(
+                    "模块 chrome_version 非法 module=%s value=%r", module.key, candidate
+                )
+                raise ChromeSyncCorruptError("模块 chrome_version 数据损坏，请重新保存模块配置") from exc
     return ChromeSyncData(
         supported=await module_supports_chrome(module),
         enabled=await module_sync_enabled(db, module.id),

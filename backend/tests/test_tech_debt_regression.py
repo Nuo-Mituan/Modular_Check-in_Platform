@@ -478,3 +478,53 @@ async def test_td19_sqlite_rollback_restores_foreign_keys(monkeypatch) -> None:
         enabled = (await conn.exec_driver_sql("PRAGMA foreign_keys")).scalar()
         assert enabled == 1
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_chrome_sync_corrupt_params_raise_conflict() -> None:
+    from app.database import SessionLocal, init_db
+    from app.models import Module
+    from app.services.bootstrap import seed_admin
+    from app.services.chrome_sync import ChromeSyncCorruptError, get_module_sync
+    from app.config import settings
+
+    await init_db()
+    await seed_admin()
+    async with SessionLocal() as db:
+        module = Module(
+            key="chrome-corrupt-test",
+            name="Chrome corrupt",
+            param_schema=[{"key": "chrome_version", "label": "Chrome", "type": "number"}],
+            params_encrypted="not-a-valid-ciphertext",
+        )
+        db.add(module)
+        await db.commit()
+        await db.refresh(module)
+        with pytest.raises(ChromeSyncCorruptError):
+            await get_module_sync(db, module)
+
+
+@pytest.mark.asyncio
+async def test_corrupt_global_chrome_version_marks_degraded() -> None:
+    from app.database import SessionLocal, init_db
+    from app.models import AppSetting
+    from app.services.chrome_sync import GLOBAL_KEY, get_global_chrome_version_with_state
+
+    await init_db()
+    async with SessionLocal() as db:
+        row = await db.get(AppSetting, GLOBAL_KEY)
+        old = row.value if row is not None else None
+        if row is None:
+            db.add(AppSetting(key=GLOBAL_KEY, value="broken"))
+        else:
+            row.value = "broken"
+        await db.commit()
+        version, degraded = await get_global_chrome_version_with_state(db)
+        assert version == 156 and degraded is True
+        row = await db.get(AppSetting, GLOBAL_KEY)
+        if old is None:
+            if row is not None:
+                await db.delete(row)
+        else:
+            row.value = old
+        await db.commit()

@@ -160,6 +160,11 @@
           "chrome_major_version": {
             "title": "Chrome Major Version",
             "type": "integer"
+          },
+          "degraded": {
+            "default": false,
+            "title": "Degraded",
+            "type": "boolean"
           }
         },
         "required": [
@@ -186,6 +191,11 @@
           "chrome_major_version": {
             "title": "Chrome Major Version",
             "type": "integer"
+          },
+          "degraded": {
+            "default": false,
+            "title": "Degraded",
+            "type": "boolean"
           },
           "expected_count": {
             "default": 0,
@@ -3789,6 +3799,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "409": {
+            "description": "模块参数损坏或无法解密"
           },
           "422": {
             "content": {
