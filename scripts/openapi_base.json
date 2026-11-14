@@ -3858,6 +3858,9 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "description": "模块参数损坏或无法解密"
+          },
           "422": {
             "content": {
               "application/json": {

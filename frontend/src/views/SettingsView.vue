@@ -736,7 +736,7 @@ onMounted(async () => {
   loading.value = true
   await Promise.all([loadPushConfig(), loadLogSettings()])
   try {
-    chromeVersion.value = await chromeStore.load()
+    chromeVersion.value = await chromeStore.load(true)
     if (chromeStore.degraded) {
       ElMessage.warning('全局 Chrome 版本配置已损坏，当前使用默认值 156，请重新保存')
     }

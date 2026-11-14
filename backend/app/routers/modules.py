@@ -82,6 +82,7 @@ from ..services import execution
 from ..services.auth_guard import lock_for_user, sensitive_limiter
 from ..services.ownership import owner_user_id
 from ..services.chrome_sync import ChromeSyncCorruptError, ChromeSyncError, ChromeSyncValidationError, chrome_sync_lock, get_module_sync, module_supports_chrome, set_module_sync
+from ..services.module_params import ModuleConfigReadError, load_module_config
 from ..services.module_update import (
     ModuleUpdateError,
     ModuleUpdateHooks,
@@ -954,23 +955,39 @@ async def reveal_sensitive(
 async def get_chrome_sync(module_id: int, db: AsyncSession = Depends(get_db)) -> ChromeSyncOut:
     module = await _get_module_or_404(db, module_id)
     try:
-        data = await get_module_sync(db, module)
+        config = await load_module_config(module, persist_schema=False)
+        data = await get_module_sync(db, module, config=config)
+    except ModuleConfigReadError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ChromeSyncCorruptError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return ChromeSyncOut(**data)
 
 
-@router.put("/{module_id}/chrome-sync", response_model=ChromeSyncOut, summary="设置模块 Chrome 同步开关")
+@router.put(
+    "/{module_id}/chrome-sync",
+    response_model=ChromeSyncOut,
+    responses={409: {"description": "模块参数损坏或无法解密"}},
+    summary="设置模块 Chrome 同步开关",
+)
 async def update_chrome_sync(
     module_id: int, payload: ChromeSyncUpdate, db: AsyncSession = Depends(get_db)
 ) -> ChromeSyncOut:
     module = await _get_module_or_404(db, module_id)
-    if not await module_supports_chrome(module):
-        raise HTTPException(status_code=400, detail="该模块不支持自定义 Chrome 版本")
     try:
-        async with chrome_sync_lock:
-            data = await set_module_sync(db, module, payload.enabled)
-            await db.commit()
+        if payload.enabled:
+            config = await load_module_config(module, persist_schema=True)
+            if not await module_supports_chrome(module, config=config):
+                raise HTTPException(status_code=400, detail="该模块不支持自定义 Chrome 版本")
+            async with chrome_sync_lock:
+                data = await set_module_sync(db, module, True, config=config)
+                await db.commit()
+        else:
+            async with chrome_sync_lock:
+                data = await set_module_sync(db, module, False)
+                await db.commit()
+    except ModuleConfigReadError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ChromeSyncValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ChromeSyncError as exc:

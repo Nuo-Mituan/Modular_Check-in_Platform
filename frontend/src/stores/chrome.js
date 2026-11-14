@@ -16,8 +16,8 @@ export const useChromeStore = defineStore('chrome', () => {
     return number
   }
 
-  async function load() {
-    if (loaded.value) return chromeMajorVersion.value
+  async function load(force = false) {
+    if (loaded.value && !force) return chromeMajorVersion.value
     const data = await systemApi.getChromeSettings()
     chromeMajorVersion.value = normalize(data.chrome_major_version) ?? DEFAULT_CHROME_VERSION
     degraded.value = Boolean(data.degraded)
@@ -34,6 +34,7 @@ export const useChromeStore = defineStore('chrome', () => {
     try {
       const data = await systemApi.updateChromeSettings({ chrome_major_version: next })
       chromeMajorVersion.value = normalize(data.chrome_major_version) ?? next
+      degraded.value = Boolean(data.degraded)
       return data
     } finally {
       saving.value = false

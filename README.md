@@ -1,6 +1,6 @@
 # 签到云台 · Modular Check-in Platform
 
-> ## v1.0.9 开发中
+> ## v1.0.9
 >
 > v1.0.9 新增手动执行不推送；v1.0.8 引入 Chrome 主版本号全局设置与模块级同步：全局值持久化在
 > `app_settings`，模块 UA 仍只读取自身 `params.chrome_version`；开关仅授权

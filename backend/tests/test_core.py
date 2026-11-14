@@ -472,3 +472,60 @@ def test_chrome_sync_refreshes_stale_param_schema_from_runtime_config() -> None:
     config = config_from_module(module)
     assert any(param.key == "chrome_version" for param in config.params)
     assert any(item.get("key") == "chrome_version" for item in module.param_schema)
+
+
+@pytest.mark.asyncio
+async def test_chrome_support_refreshes_stale_schema_before_gate() -> None:
+    from app.models import Module
+    from app.services.chrome_sync import module_supports_chrome
+
+    module = Module(key="e-hentai", name="e-hentai", param_schema=[])
+    assert await module_supports_chrome(module, persist_schema=True) is True
+    assert any(item.get("key") == "chrome_version" for item in module.param_schema)
+
+
+@pytest.mark.asyncio
+async def test_module_config_parse_failure_is_not_silently_fallen_back(tmp_path, monkeypatch) -> None:
+    from app.models import Module
+    from app.services import module_params
+
+    module = Module(key="broken-config", name="broken", param_schema=[])
+    (tmp_path / "config.json").write_text("{broken", encoding="utf-8")
+    monkeypatch.setattr(module_params, "get_module_physical_path", lambda _module: tmp_path)
+    with pytest.raises(module_params.ModuleConfigReadError):
+        await module_params.load_module_config(module)
+
+
+@pytest.mark.asyncio
+async def test_chrome_read_config_does_not_mutate_schema() -> None:
+    from app.models import Module
+    from app.services.module_params import load_module_config
+
+    module = Module(key="e-hentai", name="e-hentai", param_schema=[])
+    config = await load_module_config(module, persist_schema=False)
+    assert any(param.key == "chrome_version" for param in config.params)
+    assert module.param_schema == []
+
+
+@pytest.mark.asyncio
+async def test_chrome_config_loaded_once_for_support_and_validation(monkeypatch) -> None:
+    from app.models import Module
+    from app.services import module_params
+    from app.services.chrome_sync import module_supports_chrome
+
+    module = Module(key="e-hentai", name="e-hentai", param_schema=[])
+    calls = {"n": 0}
+    original = module_params.parse_config_file
+
+    def counted(path):
+        calls["n"] += 1
+        return original(path)
+
+    monkeypatch.setattr(module_params, "parse_config_file", counted)
+    config = await module_params.load_module_config(module, persist_schema=False)
+    assert await module_supports_chrome(module, config=config) is True
+    try:
+        module_params.validate_module_params_with_config(config, {"chrome_version": 156})
+    except Exception:
+        pass
+    assert calls["n"] == 1

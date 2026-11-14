@@ -528,3 +528,143 @@ async def test_corrupt_global_chrome_version_marks_degraded() -> None:
         else:
             row.value = old
         await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_disable_chrome_sync_does_not_parse_config(monkeypatch) -> None:
+    from app.database import SessionLocal, init_db
+    from app.models import Module
+    from app.services.bootstrap import seed_admin
+    from app.services import chrome_sync
+
+    await init_db()
+    await seed_admin()
+    async with SessionLocal() as db:
+        module = Module(
+            key="disable-chrome-with-corrupt-config",
+            name="disable-chrome",
+            param_schema=[{"key": "chrome_version", "label": "Chrome", "type": "number"}],
+        )
+        db.add(module)
+        await db.commit()
+        await db.refresh(module)
+
+        def fail(*_args, **_kwargs):
+            raise chrome_sync.ModuleConfigReadError("broken config")
+
+        monkeypatch.setattr(chrome_sync, "load_module_config", fail)
+        data = await chrome_sync.set_module_sync(db, module, False)
+        await db.commit()
+        assert data["enabled"] is False
+
+
+@pytest.mark.asyncio
+async def test_read_module_version_safe_fallback_matrix(monkeypatch) -> None:
+    from app.database import SessionLocal, init_db
+    from app.models import Module
+    from app.services.bootstrap import seed_admin
+    from app.services import chrome_sync
+
+    await init_db()
+    await seed_admin()
+    async with SessionLocal() as db:
+        module = Module(key="version-safe-matrix", name="safe", params_encrypted="x")
+        db.add(module)
+        await db.commit()
+        await db.refresh(module)
+
+        def broken(*_args, **_kwargs):
+            raise ValueError("broken")
+
+        monkeypatch.setattr(chrome_sync.parameter_cipher, "decrypt", broken)
+        assert await chrome_sync._read_module_version_safe(db, module) is None
+
+        monkeypatch.setattr(chrome_sync.parameter_cipher, "decrypt", lambda *_a, **_k: {})
+        assert await chrome_sync._read_module_version_safe(db, module) is None
+
+        monkeypatch.setattr(
+            chrome_sync.parameter_cipher, "decrypt", lambda *_a, **_k: {"chrome_version": 0}
+        )
+        assert await chrome_sync._read_module_version_safe(db, module) is None
+
+        monkeypatch.setattr(
+            chrome_sync.parameter_cipher, "decrypt", lambda *_a, **_k: {"chrome_version": 120}
+        )
+        assert await chrome_sync._read_module_version_safe(db, module) == 120
+
+
+@pytest.mark.asyncio
+async def test_disable_sync_reuses_cached_supported(monkeypatch) -> None:
+    from app.database import SessionLocal, init_db
+    from app.models import Module
+    from app.services.bootstrap import seed_admin
+    from app.services import chrome_sync
+
+    await init_db()
+    await seed_admin()
+    async with SessionLocal() as db:
+        module = Module(key="cached-supported", name="cached", param_schema=[])
+        db.add(module)
+        await db.commit()
+        await db.refresh(module)
+        chrome_sync._cache_supported(module, True)
+        data = await chrome_sync.set_module_sync(db, module, False)
+        assert data["supported"] is True
+
+
+def test_support_cache_invalidates_on_update_and_is_bounded() -> None:
+    from datetime import datetime, timezone
+    from app.models import Module
+    from app.services import chrome_sync
+
+    chrome_sync._SUPPORT_CACHE.clear()
+    module = Module(key="cache-key", name="cache", updated_at=datetime.now(timezone.utc))
+    chrome_sync._cache_supported(module, True)
+    assert chrome_sync._cached_supported(module) is True
+    module.updated_at = datetime.now(timezone.utc)
+    assert chrome_sync._cached_supported(module) is None
+
+    for index in range(chrome_sync._SUPPORT_CACHE_MAX + 5):
+        chrome_sync._cache_supported(
+            Module(key=f"cache-{index}", name="cache"), bool(index % 2)
+        )
+    assert len(chrome_sync._SUPPORT_CACHE) <= chrome_sync._SUPPORT_CACHE_MAX
+
+
+@pytest.mark.asyncio
+async def test_read_module_version_safe_handles_owner_lookup_failure(monkeypatch) -> None:
+    from unittest.mock import AsyncMock
+    from app.models import Module
+    from app.services import chrome_sync
+
+    module = Module(key="owner-failure", name="owner", params_encrypted="x")
+    monkeypatch.setattr(chrome_sync, "owner_user_id", AsyncMock(side_effect=RuntimeError("no owner")))
+    assert await chrome_sync._read_module_version_safe(None, module) is None
+
+
+@pytest.mark.asyncio
+async def test_disable_sync_first_request_reads_realtime_config(monkeypatch) -> None:
+    from app.database import SessionLocal, init_db
+    from app.models import Module
+    from app.services.bootstrap import seed_admin
+    from app.services import chrome_sync
+    from app.module_loader import ModuleConfig, ModuleParam
+
+    await init_db()
+    await seed_admin()
+    async with SessionLocal() as db:
+        module = Module(key="first-disable-live", name="live", param_schema=[])
+        db.add(module)
+        await db.commit()
+        await db.refresh(module)
+        chrome_sync._SUPPORT_CACHE.clear()
+
+        async def live_config(*_args, **_kwargs):
+            return ModuleConfig(
+                name="live",
+                params=[ModuleParam(key="chrome_version", label="Chrome", type="number")],
+            )
+
+        monkeypatch.setattr(chrome_sync, "load_module_config", live_config)
+        data = await chrome_sync.set_module_sync(db, module, False)
+        assert data["supported"] is True

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from collections import OrderedDict
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..contracts import ChromeSyncData
 from ..crypto import EncryptionContext, parameter_cipher
 from ..models import AppSetting, Module
-from .module_params import validate_module_params
+from ..module_loader import ModuleConfig
+from .module_params import (
+    ModuleConfigReadError,
+    load_module_config,
+    validate_module_params_with_config,
+)
 from .ownership import owner_user_id
 
 logger = logging.getLogger(__name__)
@@ -21,6 +27,28 @@ logger = logging.getLogger(__name__)
 # need SELECT ... FOR UPDATE or an optimistic version column instead.
 chrome_sync_lock = asyncio.Lock()
 GLOBAL_KEY = "chrome_major_version"
+_SUPPORT_CACHE_MAX = 256
+_SUPPORT_CACHE: OrderedDict[tuple[str, object], bool] = OrderedDict()
+
+
+def _support_cache_key(module: Module) -> tuple[str, object]:
+    return module.key, module.updated_at
+
+
+def _cache_supported(module: Module, supported: bool) -> None:
+    key = _support_cache_key(module)
+    _SUPPORT_CACHE[key] = supported
+    _SUPPORT_CACHE.move_to_end(key)
+    while len(_SUPPORT_CACHE) > _SUPPORT_CACHE_MAX:
+        _SUPPORT_CACHE.popitem(last=False)
+
+
+def _cached_supported(module: Module) -> bool | None:
+    key = _support_cache_key(module)
+    if key not in _SUPPORT_CACHE:
+        return None
+    _SUPPORT_CACHE.move_to_end(key)
+    return _SUPPORT_CACHE[key]
 DEFAULT_CHROME_VERSION = 156
 MIN_CHROME_VERSION = 1
 MAX_CHROME_VERSION = 999
@@ -83,11 +111,28 @@ async def _set_setting(db: AsyncSession, key: str, value: str) -> None:
         row.value = value
 
 
-async def module_supports_chrome(module: Module) -> bool:
-    return any(
-        isinstance(item, dict) and item.get("key") == "chrome_version"
-        for item in (module.param_schema or [])
-    )
+async def _load_config(module: Module, *, persist_schema: bool) -> ModuleConfig:
+    try:
+        return await load_module_config(module, persist_schema=persist_schema)
+    except ModuleConfigReadError as exc:
+        raise ChromeSyncCorruptError(str(exc)) from exc
+
+
+def _supports_config(config: ModuleConfig) -> bool:
+    return any(param.key == "chrome_version" for param in config.params)
+
+
+async def module_supports_chrome(
+    module: Module,
+    *,
+    config: ModuleConfig | None = None,
+    persist_schema: bool = False,
+) -> bool:
+    if config is None:
+        config = await _load_config(module, persist_schema=persist_schema)
+    supported = _supports_config(config)
+    _cache_supported(module, supported)
+    return supported
 
 
 async def module_sync_enabled(db: AsyncSession, module_id: int) -> bool:
@@ -101,8 +146,13 @@ async def _write_module_version(
     version: int,
     *,
     user_id: int | None = None,
+    config: ModuleConfig | None = None,
 ) -> bool:
-    if not await module_supports_chrome(module):
+    if config is None:
+        config = await _load_config(module, persist_schema=True)
+    supported = _supports_config(config)
+    _cache_supported(module, supported)
+    if not supported:
         return False
     context = EncryptionContext(
         user_id=user_id if user_id is not None else await owner_user_id(db),
@@ -117,7 +167,7 @@ async def _write_module_version(
             return False
     params["chrome_version"] = version
     try:
-        normalized = validate_module_params(module, params)
+        normalized = validate_module_params_with_config(config, params)
     except Exception as exc:
         logger.warning("Chrome 同步参数校验失败 module=%s: %s", module.id, exc)
         raise ChromeSyncValidationError(str(exc)) from exc
@@ -125,18 +175,66 @@ async def _write_module_version(
     return True
 
 
+async def _read_module_version_safe(db: AsyncSession, module: Module) -> int | None:
+    """Read the stored version without loading config.json (used on disable)."""
+    if not module.params_encrypted:
+        return None
+    try:
+        context = EncryptionContext(
+            user_id=await owner_user_id(db),
+            module_key=module.key,
+            account_index=-1,
+        )
+        raw = parameter_cipher.decrypt(module.params_encrypted, context)
+        candidate = raw.get("chrome_version")
+        return valid_chrome_version(candidate) if candidate is not None else None
+    except Exception:
+        logger.warning("读取模块 %s 的 Chrome 版本失败，关闭路径回退 null", module.key, exc_info=True)
+        return None
+
+
 async def set_module_sync(
-    db: AsyncSession, module: Module, enabled: bool
+    db: AsyncSession,
+    module: Module,
+    enabled: bool,
+    *,
+    config: ModuleConfig | None = None,
 ) -> ChromeSyncData:
     if enabled:
+        if config is None:
+            config = await _load_config(module, persist_schema=True)
         version = await get_global_chrome_version(db)
-        if not await _write_module_version(db, module, version):
+        if not await _write_module_version(db, module, version, config=config):
             raise ChromeSyncError("无法写入模块 Chrome 版本，请检查模块参数")
-    await _set_setting(db, _sync_key(module.id), "1" if enabled else "0")
-    return await get_module_sync(db, module)
+        await _set_setting(db, _sync_key(module.id), "1")
+        return await get_module_sync(db, module, config=config)
+    # Disabling must not depend on a parseable config.json.
+    await _set_setting(db, _sync_key(module.id), "0")
+    supported = _cached_supported(module)
+    if supported is None:
+        try:
+            config = await load_module_config(module, persist_schema=False)
+        except ModuleConfigReadError:
+            supported = any(
+                isinstance(item, dict) and item.get("key") == "chrome_version"
+                for item in (module.param_schema or [])
+            )
+        else:
+            supported = _supports_config(config)
+            _cache_supported(module, supported)
+    return ChromeSyncData(
+        supported=supported,
+        enabled=False,
+        chrome_version=await _read_module_version_safe(db, module),
+    )
 
 
-async def get_module_sync(db: AsyncSession, module: Module) -> ChromeSyncData:
+async def get_module_sync(
+    db: AsyncSession, module: Module, *, config: ModuleConfig | None = None
+) -> ChromeSyncData:
+    if config is None:
+        config = await _load_config(module, persist_schema=False)
+    _cache_supported(module, _supports_config(config))
     context = EncryptionContext(
         user_id=await owner_user_id(db),
         module_key=module.key,
@@ -161,7 +259,7 @@ async def get_module_sync(db: AsyncSession, module: Module) -> ChromeSyncData:
                 )
                 raise ChromeSyncCorruptError("模块 chrome_version 数据损坏，请重新保存模块配置") from exc
     return ChromeSyncData(
-        supported=await module_supports_chrome(module),
+        supported=_supports_config(config),
         enabled=await module_sync_enabled(db, module.id),
         chrome_version=version,
     )
@@ -195,6 +293,9 @@ async def set_global_chrome_version(db: AsyncSession, value: object) -> tuple[in
     for module in modules:
         try:
             wrote = await _write_module_version(db, module, version, user_id=user_id)
+        except ChromeSyncCorruptError as exc:
+            wrote = False
+            logger.warning("全局 Chrome 版本同步参数损坏 module=%s: %s", module.id, exc)
         except ChromeSyncValidationError as exc:
             wrote = False
             logger.warning("全局 Chrome 版本同步参数校验失败 module=%s: %s", module.id, exc)
