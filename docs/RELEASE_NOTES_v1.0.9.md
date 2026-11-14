@@ -35,3 +35,8 @@
 - Chrome 同步校验优先读取实时 config.json，读取失败才回退数据库 param_schema。
 - 全局 Chrome 版本存储损坏时记录 warning，并在设置读取响应中返回 degraded=true。
 - 前端对 sync-error 做 3 秒去重，并提示全局配置损坏状态。
+
+## 已知技术债
+
+- TD-36 已完成：Chrome 同步读取实时 config.json，并在差异时刷新 DB param_schema。
+- 前端 sync-error 去重暂无专门自动化测试。

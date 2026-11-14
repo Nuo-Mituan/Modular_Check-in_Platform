@@ -462,3 +462,13 @@ def test_chrome_sync_uses_module_param_validation() -> None:
         validate_module_params(module, {"chrome_version": 0})
     with pytest.raises(ModuleConfigError):
         validate_module_params(module, {"chrome_version": 1.5})
+
+
+def test_chrome_sync_refreshes_stale_param_schema_from_runtime_config() -> None:
+    from app.models import Module
+    from app.services.module_params import config_from_module
+
+    module = Module(key="e-hentai", name="e-hentai", param_schema=[])
+    config = config_from_module(module)
+    assert any(param.key == "chrome_version" for param in config.params)
+    assert any(item.get("key") == "chrome_version" for item in module.param_schema)

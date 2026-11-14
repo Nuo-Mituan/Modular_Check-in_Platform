@@ -20,6 +20,12 @@ def config_from_module(module: Module) -> ModuleConfig:
     """Prefer the live config.json used by execution; fall back to DB schema."""
     try:
         runtime = parse_config_file(get_module_physical_path(module) / "config.json")
+        runtime_schema = [param.model_dump(mode="json") for param in runtime.params]
+        if module.param_schema != runtime_schema:
+            # Persist the refresh in the caller's transaction so a module file
+            # update cannot leave Chrome validation on a stale DB schema.
+            module.param_schema = runtime_schema
+            logger.info("模块 %s 的 param_schema 已按实时 config.json 刷新", module.key)
         return runtime
     except Exception as exc:
         logger.warning(
