@@ -18,6 +18,11 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 FROM python:3.11-slim AS runtime
 
+ARG APP_UID=10001
+ARG APP_GID=10001
+ENV PUID=${APP_UID} \
+    PGID=${APP_GID}
+
 LABEL org.opencontainers.image.title="Modular Check-in Platform" \
       org.opencontainers.image.description="Self-hosted daily check-in platform with hot-pluggable modules" \
       org.opencontainers.image.version="1.0.9"
@@ -36,8 +41,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates tzdata \
+    && apt-get install -y --no-install-recommends ca-certificates tzdata passwd \
     && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --system --gid "${APP_GID}" app \
+    && useradd --system --uid "${APP_UID}" --gid app --home-dir /app --shell /usr/sbin/nologin app
 
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt

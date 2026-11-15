@@ -118,7 +118,8 @@ cd modular-check-in-platform
 
 mkdir -p data logs modules down
 cp .env.example .env        # 可选：修改端口；ADMIN_PASS 留空则自动生成随机密码
-# PUID/PGID 默认 10001；入口脚本会 chown data/logs/modules/down 后降权
+# PUID/PGID 默认 10001；构建时映射为 APP_UID/APP_GID，
+# 镜像内创建 app 用户；入口脚本会 chown data/logs/modules/down 后降权
 ```
 
 ### 2. 构建并启动
@@ -676,7 +677,7 @@ async def run(params: dict[str, Any]) -> dict[str, Any]:
 | `PUSH_REQUEST_RETRY_SECONDS` | `0.8` | 单次请求重试间隔（秒）。 |
 | `PUSH_RESPONSE_MAX_CHARS` | `4000` | 推送响应记录截断长度。 |
 | `PUSH_DRIVER_MAX_VERSIONS` | `5` | 每个自定义驱动保留的最大版本数。 |
-| `PUID` / `PGID` | `10001` | 容器入口修复挂载目录权限后降权使用的 UID/GID。 |
+| `PUID` / `PGID` | `10001` | 容器入口修复挂载目录权限后降权使用的 UID/GID；Compose 构建参数 `APP_UID`/`APP_GID` 默认同步此值。 |
 | `DATA_DIR` | `./data` | 数据库与密钥目录；容器内为 `/app/data`。 |
 | `MODULES_DIR` | `./modules` | 模块目录；容器内为 `/app/modules`。 |
 | `LOGS_DIR` | `./logs` | 文件日志/旧日志目录；容器内为 `/app/logs`。 |
