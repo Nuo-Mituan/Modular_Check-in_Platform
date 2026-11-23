@@ -846,10 +846,6 @@ async def module_icon(
             content=content,
             headers={"Cache-Control": "no-store"},
         )
-    logger.info(
-        "解析模块图标：key=%s directory=%s path=%s resolved=%s",
-        key, directory, path, candidate,
-    )
     return _icon_response(request, data, media_type, current_mtime)
 
 

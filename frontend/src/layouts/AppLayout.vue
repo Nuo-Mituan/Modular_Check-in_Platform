@@ -44,7 +44,10 @@
         </div>
         <div class="sidebar-foot">
           <span>Self-hosted</span>
-          <span class="version">v{{ appStore.meta?.version || APP_VERSION }}</span>
+          <span class="version">
+            v{{ appStore.meta?.version || APP_VERSION }}
+            <span v-if="updateAvailable" class="update-dot"></span>
+          </span>
         </div>
       </div>
     </aside>
@@ -175,6 +178,7 @@ import {
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { initialOf, todayLabel } from '@/utils/format'
+import { compareVersions, parseVersion } from '@/utils/versionCheck'
 
 const route = useRoute()
 const router = useRouter()
@@ -182,7 +186,56 @@ const auth = useAuthStore()
 const appStore = useAppStore()
 
 const mobileNavOpen = ref(false)
+const updateAvailable = ref(false)
 let healthTimer = null
+
+const GITHUB_REPO = 'Nuo-Mituan/Modular_Check-in_Platform'
+const LATEST_RELEASE_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`
+const RAW_VERSION_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/backend/app/__init__.py`
+
+function normalizeVersionTag(value) {
+  return String(value || '').trim().replace(/^v/i, '')
+}
+
+async function fetchLatestPublicVersion() {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), 5000)
+  try {
+    const response = await fetch(LATEST_RELEASE_URL, {
+      cache: 'no-store',
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: controller.signal,
+    })
+    if (response.ok) {
+      const data = await response.json()
+      const candidate = normalizeVersionTag(data?.tag_name || data?.name)
+      if (parseVersion(candidate)) return candidate
+    }
+    const fallback = await fetch(RAW_VERSION_URL, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    if (!fallback.ok) return null
+    const source = await fallback.text()
+    const match = source.match(/__version__\s*=\s*["']([^"']+)["']/)
+    return match ? normalizeVersionTag(match[1]) : null
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
+
+async function checkForUpdates() {
+  const current = normalizeVersionTag(appStore.meta?.version || APP_VERSION)
+  if (!parseVersion(current)) return
+  try {
+    const latest = await fetchLatestPublicVersion()
+    updateAvailable.value = Boolean(
+      latest && parseVersion(latest) && compareVersions(latest, current) === 1,
+    )
+  } catch {
+    updateAvailable.value = false
+  }
+}
 
 const navItems = [
   { name: 'dashboard', label: '运行概览', icon: Odometer },
@@ -224,6 +277,7 @@ async function handleUserCommand(command) {
 
 onMounted(async () => {
   await Promise.all([appStore.fetchMeta(), appStore.fetchHealth()])
+  void checkForUpdates()
   healthTimer = window.setInterval(() => {
     appStore.fetchHealth()
   }, 30000)
@@ -434,7 +488,22 @@ onBeforeUnmount(() => {
 }
 
 .version {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
   font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.update-dot {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: #ff4d4f;
+  align-self: center;
+  vertical-align: middle;
+  flex: none;
 }
 
 .main {
