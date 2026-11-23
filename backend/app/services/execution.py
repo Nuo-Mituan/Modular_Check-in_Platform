@@ -404,6 +404,7 @@ async def _run_one_account(
     total: int,
     account: dict[str, object],
     capture: OutputCapture,
+    timeout: int | None,
 ) -> tuple[AccountResult, bool]:
     display = str(account.get("display") or "未提供账号标识")
     capture.writeline("-" * 68)
@@ -421,13 +422,13 @@ async def _run_one_account(
         runner = load_runner(module_key, module_directory)
         raw_result = await asyncio.wait_for(
             _invoke_run(runner.run, account["params"]),  # type: ignore[arg-type]  # TODO(v1.0.3): fix typing
-            timeout=settings.module_timeout,
+            timeout=None if timeout == 0 else timeout,
         )
         success, message, extra = _normalize_result(raw_result)
         if extra:
             capture.writeline(f"[返回数据] {extra}")
     except asyncio.TimeoutError:
-        message = f"账号执行超时（超过 {settings.module_timeout} 秒）"
+        message = f"账号执行超时（超过 {timeout} 秒）"
         error_text = message
         capture.writeline(f"[错误] {message}")
     except asyncio.CancelledError:
@@ -476,6 +477,7 @@ async def _run_accounts(
     module_directory: str | None,
     accounts: list[dict[str, object]],
     capture: OutputCapture,
+    timeout: int | None,
 ) -> tuple[list[AccountResult], bool]:
     results: list[AccountResult] = []
     total = len(accounts)
@@ -487,6 +489,7 @@ async def _run_accounts(
             total=total,
             account=account,
             capture=capture,
+            timeout=timeout,
         )
         results.append(result)
         if cancelled:
@@ -544,7 +547,10 @@ async def _perform(
             else:
                 capture.writeline(f"模式：单账号 · {accounts[0]['display']}")
             capture.writeline("")
-            results, cancelled = await _run_accounts(module_key, module_directory, accounts, capture)
+            results, cancelled = await _run_accounts(
+                module_key, module_directory, accounts, capture,
+                module.execution_timeout_seconds if module.execution_timeout_seconds is not None else 300,
+            )
             if cancelled:
                 return _cancelled_outcome(results, total)
             status, message, ok_count, failed_count = _aggregate(results)

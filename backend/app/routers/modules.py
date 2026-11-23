@@ -181,6 +181,7 @@ def _module_out(
         push_independent=bool(module.push_independent),
         push_unified=bool(module.push_unified),
         multi_account=bool(module.multi_account),
+        execution_timeout_seconds=(module.execution_timeout_seconds if module.execution_timeout_seconds is not None else 300),
         load_error=module.load_error,
         last_run_at=module.last_run_at,
         last_status=module.last_status,
@@ -1031,6 +1032,7 @@ async def update_module(
     module.repeat_cycle = plan.repeat_cycle
     module.repeat_sub_value = plan.repeat_sub_value
     module.multi_account = bool(config.multi_account)
+    module.execution_timeout_seconds = plan.execution_timeout_seconds
     if plan.params_encrypted is not None:
         module.params_encrypted = plan.params_encrypted
     if plan.accounts_encrypted is not None:

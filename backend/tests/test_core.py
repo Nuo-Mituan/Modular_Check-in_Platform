@@ -529,3 +529,14 @@ async def test_chrome_config_loaded_once_for_support_and_validation(monkeypatch)
     except Exception:
         pass
     assert calls["n"] == 1
+
+
+def test_execution_timeout_accepts_zero_but_rejects_one_to_nine() -> None:
+    from pydantic import ValidationError
+    from app.schemas import ModuleUpdateRequest
+
+    assert ModuleUpdateRequest(execution_timeout_seconds=0).execution_timeout_seconds == 0
+    assert ModuleUpdateRequest(execution_timeout_seconds=300).execution_timeout_seconds == 300
+    for value in (1, 5, 9):
+        with pytest.raises(ValidationError):
+            ModuleUpdateRequest(execution_timeout_seconds=value)

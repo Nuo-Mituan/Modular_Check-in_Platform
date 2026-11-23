@@ -216,6 +216,21 @@
                     @update:repeat-sub-value="(value) => (repeatSubValue = value)"
                   />
 
+                  <div class="push-toggle-row execution-timeout-row">
+                    <div>
+                      <strong><el-icon><Timer /></el-icon>执行超时时间</strong>
+                      <p>单位秒；0 表示不施加执行超时，统一推送等待改用超时兜底时间；不同模块可分别设置。</p>
+                    </div>
+                    <el-input-number
+                      v-model="executionTimeoutSeconds"
+                      :min="0"
+                      :max="86400"
+                      :step="10"
+                      placeholder="未设置"
+                      controls-position="right"
+                    />
+                  </div>
+
                   <div class="schedule-summary">
                     <div class="summary-row">
                       <span>当前已保存</span>
@@ -501,6 +516,7 @@ const startTime = ref('08:00')
 const endTime = ref('10:00')
 const repeatCycle = ref('daily')
 const repeatSubValue = ref('')
+const executionTimeoutSeconds = ref(300)
 const pushIndependent = ref(false)
 const pushUnified = ref(false)
 const chromeSyncEnabled = ref(false)
@@ -729,6 +745,7 @@ async function saveConfig() {
       push_enabled: pushIndependent.value || pushUnified.value,
       push_independent: pushIndependent.value,
       push_unified: pushUnified.value,
+      execution_timeout_seconds: executionTimeoutSeconds.value,
     }
     if (module.value.multi_account) {
       payload.accounts = accounts.value.map((account) => ({

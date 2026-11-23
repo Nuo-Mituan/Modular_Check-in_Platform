@@ -308,6 +308,41 @@ async def apply_or_probe(
     return ApplyOrProbeResult(True)
 
 
+async def get_scheduled_deadlines(cycle_id: str) -> list[datetime]:
+    """Return scheduled_at + each module's execution timeout (0 if unset)."""
+    from datetime import timedelta
+
+    day = date.fromisoformat(cycle_id)
+    async with SessionLocal() as db:
+        from .push import load_unified_settings
+        from .push_plan import configured_timeout_at
+
+        settings_data = await load_unified_settings(db)
+        fallback = configured_timeout_at(cycle_id, settings_data)
+        modules = list(
+            (await db.execute(select(Module).where(Module.enabled.is_(True), Module.push_unified.is_(True)).order_by(Module.id.asc()))).scalars().all()
+        )
+        deadlines: list[datetime] = []
+        for module in modules:
+            due, _ = module_due(module, day)
+            if not due:
+                continue
+            schedule = await current_schedule(db, module)
+            if schedule is None or schedule.status == SCHEDULE_CANCELLED:
+                continue
+            if schedule.scheduled_at.astimezone(settings.timezone_info).date() != day:
+                continue
+            seconds = (
+                300 if module.execution_timeout_seconds is None
+                else module.execution_timeout_seconds
+            )
+            if seconds == 0:
+                deadlines.append(fallback)
+            else:
+                deadlines.append(schedule.scheduled_at + timedelta(seconds=seconds))
+        return deadlines
+
+
 async def get_scheduled_times(cycle_id: str) -> list[datetime]:
     day = date.fromisoformat(cycle_id)
     async with SessionLocal() as db:

@@ -132,6 +132,10 @@ class Module(Base):
     repeat_sub_value: Mapped[str] = mapped_column(String(10), default="")
 
     multi_account: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Per-module execution timeout; also drives the unified-push wait (no default).
+    execution_timeout_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=300
+    )
     # Legacy aggregate kept in sync by the API for older clients.
     push_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     # Independent = push this run immediately; unified = contribute to the

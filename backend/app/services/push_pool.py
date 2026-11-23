@@ -36,6 +36,7 @@ from .push_state import (
     POOL_SUCCESS,
     POOL_TIMEOUT,
     ensure_batch,
+    get_scheduled_deadlines,
     get_scheduled_times,
     list_batches,
     persist_schedule,
@@ -59,8 +60,8 @@ async def _get_timeout_settings() -> dict[str, object]:
 
 
 async def calculate_unified_trigger_at(cycle_id: str) -> datetime | None:
-    times = await get_scheduled_times(cycle_id)
-    return latest_trigger(times)
+    deadlines = await get_scheduled_deadlines(cycle_id)
+    return latest_trigger(deadlines)
 
 
 async def configure_daily_batch(cycle_id: str | None = None):
@@ -68,7 +69,7 @@ async def configure_daily_batch(cycle_id: str | None = None):
     batch = await ensure_batch(cycle_id)
     if batch is None:
         return None
-    times = await get_scheduled_times(cycle_id)
+    times = await get_scheduled_deadlines(cycle_id)
     settings_data = await _get_timeout_settings()
     plan = _configure_daily_batch(cycle_id, times, settings_data)
     batch = await persist_schedule(

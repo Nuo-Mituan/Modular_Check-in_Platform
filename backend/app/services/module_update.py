@@ -27,6 +27,7 @@ class ModuleUpdatePayload(Protocol):
     enabled: bool | None
     params: dict[str, object] | None
     accounts: list[object] | None
+    execution_timeout_seconds: int | None
 
 
 @dataclass
@@ -64,6 +65,7 @@ class ModuleUpdatePlan:
     accounts_encrypted: str | None = None
     validated_params: dict[str, object] | None = None
     validated_accounts: list[dict[str, object]] | None = None
+    execution_timeout_seconds: int = 300
 
 
 class ModuleUpdateError(ValueError):
@@ -140,6 +142,13 @@ def plan_module_update(
 ) -> ModuleUpdatePlan:
     start, end, cycle, sub, changed = _next_schedule(module, payload, hooks)
     target_enabled = module.enabled if payload.enabled is None else payload.enabled
+    fields_set = getattr(payload, "model_fields_set", set())
+    if "execution_timeout_seconds" in fields_set:
+        execution_timeout = payload.execution_timeout_seconds
+    else:
+        execution_timeout = module.execution_timeout_seconds
+    if execution_timeout is None:
+        execution_timeout = 300
     accounts_encrypted = None
     params_encrypted = None
     validated_params = None
@@ -178,4 +187,5 @@ def plan_module_update(
         accounts_encrypted=accounts_encrypted,
         validated_params=validated_params,
         validated_accounts=validated_accounts,
+        execution_timeout_seconds=execution_timeout,
     )

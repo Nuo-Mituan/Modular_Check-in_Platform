@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class LoginRequest(BaseModel):
@@ -96,6 +96,7 @@ class ModuleOut(BaseModel):
     push_independent: bool = False
     push_unified: bool = False
     multi_account: bool = False
+    execution_timeout_seconds: int = 300
     load_error: str | None = None
 
     last_run_at: datetime | None = None
@@ -143,6 +144,14 @@ class ModuleUpdateRequest(BaseModel):
     enabled: bool | None = None
     params: dict[str, Any] | None = None
     accounts: list[AccountInput] | None = None
+    execution_timeout_seconds: int | None = Field(default=300, ge=0, le=86400)
+
+    @field_validator("execution_timeout_seconds")
+    @classmethod
+    def _validate_execution_timeout(cls, value: int | None) -> int | None:
+        if value is not None and 0 < value < 10:
+            raise ValueError("执行超时时间必须为 0 或 10-86400 秒")
+        return value
 
 
 class ToggleRequest(BaseModel):

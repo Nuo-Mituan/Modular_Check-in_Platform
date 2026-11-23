@@ -528,10 +528,11 @@ async def test_concurrent_retention_flush_and_supplement_no_deadlock(fast_retrie
 
 
 @pytest.mark.asyncio
-async def test_calculate_trigger_uses_latest_schedule_plus_one_minute(monkeypatch) -> None:
+async def test_calculate_trigger_uses_latest_schedule_plus_module_timeout(monkeypatch) -> None:
     await init_db()
     await _disable_pool_modules()
     module = _module(cycle="daily")
+    module.execution_timeout_seconds = 300
     await _add_modules(module)
 
     class FakeSchedule:
@@ -547,7 +548,7 @@ async def test_calculate_trigger_uses_latest_schedule_plus_one_minute(monkeypatc
     trigger = await push_pool.calculate_unified_trigger_at("2026-11-08")
     assert trigger is not None
     assert trigger == datetime(
-        2026, 11, 8, 9, 38, tzinfo=settings.timezone_info
+        2026, 11, 8, 9, 42, tzinfo=settings.timezone_info
     ).astimezone(timezone.utc)
 
 
@@ -688,7 +689,7 @@ async def test_configure_clears_plan_when_no_schedule(monkeypatch) -> None:
         await db.commit()
     async def no_trigger(*_args, **_kwargs):
         return None
-    monkeypatch.setattr("app.services.push_state.get_scheduled_times", no_trigger, raising=False)
+    monkeypatch.setattr("app.services.push_state.get_scheduled_deadlines", no_trigger, raising=False)
     await push_pool.configure_daily_batch(cycle)
     async with SessionLocal() as db:
         batch = await db.scalar(select(PushBatch).where(PushBatch.cycle_id == cycle))
@@ -811,7 +812,7 @@ async def test_configure_clear_removes_scheduler_job(monkeypatch) -> None:
     removed: list[str] = []
     async def remove(cycle_id: str) -> None:
         removed.append(cycle_id)
-    monkeypatch.setattr("app.services.push_state.get_scheduled_times", no_trigger, raising=False)
+    monkeypatch.setattr("app.services.push_state.get_scheduled_deadlines", no_trigger, raising=False)
     monkeypatch.setattr("app.services.push_pool._remove_unified_job", remove)
     await push_pool.configure_daily_batch(cycle)
     assert removed == [cycle]
@@ -866,7 +867,7 @@ async def test_noop_batch_restores_outbox_audit() -> None:
     await init_db()
     await _disable_pool_modules()
     cycle = datetime.now(settings.timezone_info).date().isoformat()
-    only_skip = _module(cycle="weekly", sub="1")
+    only_skip = _module(cycle="yearly", sub="01-01")
     await _add_modules(only_skip)
     await push_pool.ensure_batch(cycle)
     await push_pool.flush_due_batches()
@@ -920,3 +921,54 @@ async def test_cross_day_pending_batches_are_terminalized() -> None:
         assert skipped is not None and skipped.status == "noop"
         assert active is not None and active.status == "expired"
     assert stats.total_processed >= 2
+
+
+@pytest.mark.asyncio
+async def test_unified_trigger_uses_each_module_timeout(monkeypatch) -> None:
+    await init_db()
+    await _disable_pool_modules()
+    first = _module(cycle="daily")
+    first.execution_timeout_seconds = 60
+    second = _module(cycle="daily")
+    second.execution_timeout_seconds = 300
+    first_id, second_id = await _add_modules(first, second)
+    schedules = {
+        first_id: datetime(2026, 11, 8, 9, 37, tzinfo=settings.timezone_info),
+        second_id: datetime(2026, 11, 8, 9, 40, tzinfo=settings.timezone_info),
+    }
+
+    class FakeSchedule:
+        status = "pending"
+        def __init__(self, scheduled_at):
+            self.scheduled_at = scheduled_at
+
+    async def fake_current(_db, module):
+        return FakeSchedule(schedules[module.id])
+
+    monkeypatch.setattr("app.services.push_state.current_schedule", fake_current)
+    trigger = await push_pool.calculate_unified_trigger_at("2026-11-08")
+    assert trigger == datetime(
+        2026, 11, 8, 9, 45, tzinfo=settings.timezone_info
+    ).astimezone(timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_zero_module_timeout_uses_unified_fallback_time(monkeypatch) -> None:
+    await init_db()
+    await _disable_pool_modules()
+    module = _module(cycle="daily")
+    module.execution_timeout_seconds = 0
+    await _add_modules(module)
+
+    class FakeSchedule:
+        status = "pending"
+        scheduled_at = datetime(2026, 11, 8, 9, 37, tzinfo=settings.timezone_info)
+
+    async def fake_current(*_args, **_kwargs):
+        return FakeSchedule()
+
+    monkeypatch.setattr("app.services.push_state.current_schedule", fake_current)
+    trigger = await push_pool.calculate_unified_trigger_at("2026-11-08")
+    assert trigger == datetime(
+        2026, 11, 8, 23, 30, tzinfo=settings.timezone_info
+    ).astimezone(timezone.utc)

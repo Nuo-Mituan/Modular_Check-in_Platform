@@ -8,14 +8,32 @@ from ..config import settings
 from ..scheduling import ScheduleError, parse_hhmm
 from .push_time import business_date as business_date, cycle_id_for as cycle_id_for
 
-__all__ = ["business_date", "cycle_id_for", "latest_trigger", "timeout_at", "configure_daily_batch"]
+__all__ = [
+    "business_date", "cycle_id_for", "latest_trigger", "timeout_at",
+    "configured_timeout_at", "configure_daily_batch",
+]
 
 
 def latest_trigger(times: list[datetime]) -> datetime | None:
-    """Return max(times) + 1 minute in UTC; None for empty input."""
+    """Return the latest per-module deadline (already includes its timeout)."""
     if not times:
         return None
-    return (max(times) + timedelta(minutes=1)).astimezone(timezone.utc)
+    return max(times).astimezone(timezone.utc)
+
+
+def configured_timeout_at(
+    cycle_id: str, data: dict[str, object]
+) -> datetime:
+    """Return the configured fallback wall-clock time for a cycle."""
+    try:
+        hour, minute = parse_hhmm(str(data.get("timeout_time", "23:30")))
+    except ScheduleError:
+        hour, minute = 23, 30
+    return datetime.combine(
+        date.fromisoformat(cycle_id),
+        time(hour, minute),
+        tzinfo=settings.timezone_info,
+    ).astimezone(timezone.utc)
 
 
 def timeout_at(
@@ -24,15 +42,7 @@ def timeout_at(
     """Optional fallback time; disabled, missing, or earlier => None."""
     if not bool(data.get("timeout_enabled")) or trigger_at is None:
         return None
-    try:
-        hour, minute = parse_hhmm(str(data.get("timeout_time", "23:30")))
-    except ScheduleError:
-        hour, minute = 23, 30
-    candidate = datetime.combine(
-        date.fromisoformat(cycle_id),
-        time(hour, minute),
-        tzinfo=settings.timezone_info,
-    ).astimezone(timezone.utc)
+    candidate = configured_timeout_at(cycle_id, data)
     return candidate if candidate > trigger_at.astimezone(timezone.utc) else None
 
 

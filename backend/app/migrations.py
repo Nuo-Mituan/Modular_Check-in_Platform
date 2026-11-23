@@ -29,6 +29,7 @@ _LEGACY_COLUMNS: dict[str, str] = {
     "repeat_cycle": "VARCHAR(20)",
     "repeat_sub_value": "VARCHAR(10)",
     "multi_account": "BOOLEAN",
+    "execution_timeout_seconds": "INTEGER DEFAULT 300",
     "push_enabled": "BOOLEAN",
     "accounts_encrypted": "TEXT",
     "push_independent": "BOOLEAN",
@@ -219,6 +220,10 @@ async def migrate_schema() -> None:
             added.append(name)
         if added:
             logger.info("数据库迁移：为 modules 添加字段 %s", ", ".join(added))
+        await connection.exec_driver_sql(
+            "UPDATE modules SET execution_timeout_seconds=300 "
+            "WHERE execution_timeout_seconds IS NULL"
+        )
 
         result = await connection.exec_driver_sql("PRAGMA table_info(push_config)")
         config_columns = {row[1] for row in result.fetchall()}
