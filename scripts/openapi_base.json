@@ -1533,7 +1533,7 @@
             "anyOf": [
               {
                 "maximum": 86400.0,
-                "minimum": 10.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -2720,6 +2720,11 @@
             "title": "Build Time",
             "type": "string"
           },
+          "check_failed": {
+            "default": false,
+            "title": "Check Failed",
+            "type": "boolean"
+          },
           "environment": {
             "title": "Environment",
             "type": "string"
@@ -2727,6 +2732,33 @@
           "git_commit": {
             "title": "Git Commit",
             "type": "string"
+          },
+          "has_update": {
+            "default": false,
+            "title": "Has Update",
+            "type": "boolean"
+          },
+          "html_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Html Url"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
           },
           "min_supported_client": {
             "title": "Min Supported Client",

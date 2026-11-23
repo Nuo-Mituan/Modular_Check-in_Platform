@@ -450,6 +450,10 @@ class VersionInfoOut(BaseModel):
     payload_checksum: str | None = None
     payload_bytes: int | None = None
     environment: str
+    latest_version: str | None = None
+    has_update: bool = False
+    html_url: str | None = None
+    check_failed: bool = False
 
 
 class ChromeSettingsOut(BaseModel):

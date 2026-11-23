@@ -37,6 +37,7 @@ from ..services.push_outbox import pending_count as outbox_pending_count
 from ..services.auth_sessions import invalidate_all_sessions
 from ..services.preferences import set_developer_mode
 from ..services.chrome_sync import chrome_sync_lock, get_global_chrome_version_with_state, set_global_chrome_version
+from ..services.version_check import get_latest_release, newer_version
 from ..services.hub import hub
 from ..services.scheduler import scheduler_service
 from ..timeutils import utcnow
@@ -78,8 +79,10 @@ def _resolve_git_commit() -> str:
 @health_router.get("/version", response_model=VersionInfoOut, summary="版本与更新判定信息")
 async def version_info(request: Request, response: Response) -> VersionInfoOut:
     now = datetime.now(timezone.utc).isoformat()
-    etag = f'"v{settings.app_version}"'
-    response.headers["Cache-Control"] = "public, max-age=60"
+    release = await get_latest_release()
+    has_update = bool(release and newer_version(release.tag_name, settings.app_version))
+    etag = f'"v{settings.app_version}-{release.tag_name if release else "none"}-{int(has_update)}"'
+    response.headers["Cache-Control"] = "no-store"
     response.headers["ETag"] = etag
     response.headers["X-Content-Type-Options"] = "nosniff"
     if request.headers.get("if-none-match") == etag:
@@ -94,6 +97,10 @@ async def version_info(request: Request, response: Response) -> VersionInfoOut:
         payload_checksum=os.environ.get("PAYLOAD_CHECKSUM") or None,
         payload_bytes=int(os.environ["PAYLOAD_BYTES"]) if os.environ.get("PAYLOAD_BYTES") else None,
         environment=os.environ.get("APP_ENV", "production"),
+        latest_version=release.tag_name if release else None,
+        has_update=has_update,
+        html_url=release.html_url if release else None,
+        check_failed=release is None,
     )
 
 

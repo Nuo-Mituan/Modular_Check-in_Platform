@@ -63,6 +63,7 @@ export const dashboardApi = {
 export const systemApi = {
   health: () => http.get('/health', { silent: true }),
   meta: () => http.get('/meta'),
+  getVersion: () => http.get('/version', { silent: true }),
   getDeveloperMode: () => http.get('/settings/developer'),
   updateDeveloperMode: (enabled) => http.put('/settings/developer', { enabled }),
   getLogSettings: () => http.get('/settings/logs'),

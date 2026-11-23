@@ -540,3 +540,12 @@ def test_execution_timeout_accepts_zero_but_rejects_one_to_nine() -> None:
     for value in (1, 5, 9):
         with pytest.raises(ValidationError):
             ModuleUpdateRequest(execution_timeout_seconds=value)
+
+
+def test_version_check_compares_stable_versions() -> None:
+    from app.services.version_check import newer_version
+
+    assert newer_version("v1.1.1", "1.1.0") is True
+    assert newer_version("1.1.0", "1.1.0") is False
+    assert newer_version("v1.0.9", "1.1.0") is False
+    assert newer_version("not-a-version", "1.1.0") is False
