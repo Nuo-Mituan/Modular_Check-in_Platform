@@ -344,23 +344,6 @@ async def get_scheduled_deadlines(cycle_id: str) -> list[datetime]:
         return deadlines
 
 
-async def get_scheduled_times(cycle_id: str) -> list[datetime]:
-    day = date.fromisoformat(cycle_id)
-    async with SessionLocal() as db:
-        modules = list(
-            (await db.execute(select(Module).where(Module.enabled.is_(True), Module.push_unified.is_(True)).order_by(Module.id.asc()))).scalars().all()
-        )
-        times: list[datetime] = []
-        for module in modules:
-            due, _ = module_due(module, day)
-            if not due:
-                continue
-            schedule = await current_schedule(db, module)
-            if schedule is None or schedule.status == SCHEDULE_CANCELLED:
-                continue
-            if schedule.scheduled_at.astimezone(settings.timezone_info).date() == day:
-                times.append(schedule.scheduled_at)
-        return times
 
 
 async def persist_schedule(cycle_id: str, trigger_at: datetime | None, timeout_at: datetime | None) -> PushBatch | None:

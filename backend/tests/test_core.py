@@ -557,3 +557,20 @@ def test_meta_marks_global_module_timeout_deprecated() -> None:
     prop = app.openapi()["components"]["schemas"]["MetaOut"]["properties"]["module_timeout"]
     assert prop.get("deprecated") is True
     assert "Deprecated" in prop.get("description", "")
+
+
+def test_fetch_release_logs_http_error(monkeypatch, caplog) -> None:
+    import logging
+    import urllib.error
+    from app.services import version_check
+
+    def fail(*_args, **_kwargs):
+        raise urllib.error.HTTPError(
+            version_check.RELEASE_URL, 403, "rate limited", {}, None
+        )
+
+    monkeypatch.setattr(version_check.urllib.request, "urlopen", fail)
+    with caplog.at_level(logging.WARNING):
+        assert version_check._fetch_release() is None
+    assert "403" in caplog.text
+    assert "HTTPError" in caplog.text

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import threading
 import time
 import urllib.request
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 RELEASE_URL = "https://api.github.com/repos/Nuo-Mituan/Modular_Check-in_Platform/releases/latest"
 SUCCESS_TTL = 3600.0
@@ -44,7 +47,12 @@ def _fetch_release() -> LatestRelease | None:
             return None
         html_url = data.get("html_url")
         return LatestRelease(tag_name=tag, html_url=str(html_url) if html_url else None)
-    except Exception:
+    except Exception as exc:
+        status = getattr(exc, "code", None)
+        logger.warning(
+            "检查 GitHub 版本失败 url=%s status=%s error=%s: %s",
+            RELEASE_URL, status, type(exc).__name__, exc,
+        )
         return None
 
 

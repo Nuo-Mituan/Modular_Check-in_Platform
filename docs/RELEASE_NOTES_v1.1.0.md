@@ -15,7 +15,7 @@
 
 ## 验证
 
-- 后端：317 passed / 0 failed
+- 后端：318 passed / 0 failed
 - mypy：0 errors
 - OpenAPI：paths=43 / breaking=0
 
@@ -40,3 +40,8 @@
 
 - 执行超时为 0 时，主触发截止时间使用 `max(scheduled_at, 超时兜底时间)`，不会早于模块计划执行时间。
 - 全局 `MODULE_TIMEOUT` 在 Meta API 中标记为 deprecated；执行只使用模块级 `execution_timeout_seconds`。
+
+## 第八轮审查修复
+
+- GitHub 版本检查失败时记录 URL、HTTP 状态、异常类型和异常信息，同时保持 check_failed 契约。
+- 删除未使用的 get_scheduled_times 及其导入，统一使用 get_scheduled_deadlines。

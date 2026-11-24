@@ -37,7 +37,6 @@ from .push_state import (
     POOL_TIMEOUT,
     ensure_batch,
     get_scheduled_deadlines,
-    get_scheduled_times,
     list_batches,
     persist_schedule,
     apply_or_probe,
