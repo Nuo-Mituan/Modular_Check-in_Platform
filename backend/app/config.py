@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     csrf_enabled: bool = True
 
     # ------------------------------------------------------------ execution
+    # Deprecated/Legacy: kept for config compatibility; execution uses per-module timeout.
     module_timeout: int = 300
     account_interval_min_seconds: int = 120
     account_interval_max_seconds: int = 300

@@ -549,3 +549,11 @@ def test_version_check_compares_stable_versions() -> None:
     assert newer_version("1.1.0", "1.1.0") is False
     assert newer_version("v1.0.9", "1.1.0") is False
     assert newer_version("not-a-version", "1.1.0") is False
+
+
+def test_meta_marks_global_module_timeout_deprecated() -> None:
+    from app.main import app
+
+    prop = app.openapi()["components"]["schemas"]["MetaOut"]["properties"]["module_timeout"]
+    assert prop.get("deprecated") is True
+    assert "Deprecated" in prop.get("description", "")

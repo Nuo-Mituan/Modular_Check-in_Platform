@@ -972,3 +972,25 @@ async def test_zero_module_timeout_uses_unified_fallback_time(monkeypatch) -> No
     assert trigger == datetime(
         2026, 11, 8, 23, 30, tzinfo=settings.timezone_info
     ).astimezone(timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_zero_timeout_never_triggers_before_scheduled_at(monkeypatch) -> None:
+    await init_db()
+    await _disable_pool_modules()
+    module = _module(cycle="daily")
+    module.execution_timeout_seconds = 0
+    await _add_modules(module)
+
+    class FakeSchedule:
+        status = "pending"
+        scheduled_at = datetime(2026, 11, 8, 23, 45, tzinfo=settings.timezone_info)
+
+    async def fake_current(*_args, **_kwargs):
+        return FakeSchedule()
+
+    monkeypatch.setattr("app.services.push_state.current_schedule", fake_current)
+    trigger = await push_pool.calculate_unified_trigger_at("2026-11-08")
+    assert trigger == datetime(
+        2026, 11, 8, 23, 45, tzinfo=settings.timezone_info
+    ).astimezone(timezone.utc)

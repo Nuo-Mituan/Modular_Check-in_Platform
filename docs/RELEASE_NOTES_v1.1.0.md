@@ -15,7 +15,7 @@
 
 ## 验证
 
-- 后端：315 passed / 0 failed
+- 后端：317 passed / 0 failed
 - mypy：0 errors
 - OpenAPI：paths=43 / breaking=0
 
@@ -35,3 +35,8 @@
 - 网页端每次打开时请求 `/api/version`；服务端查询项目 GitHub 最新发布，成功缓存 1 小时、失败缓存 5 分钟。
 - 发现远端版本高于当前版本时，左下角版本文本后显示红色提示圆点（带轻微脉冲）。
 - 圆点直径为版本文本字号的 0.5em，即文字高度的 1/2。
+
+## 第七轮审查修复
+
+- 执行超时为 0 时，主触发截止时间使用 `max(scheduled_at, 超时兜底时间)`，不会早于模块计划执行时间。
+- 全局 `MODULE_TIMEOUT` 在 Meta API 中标记为 deprecated；执行只使用模块级 `execution_timeout_seconds`。

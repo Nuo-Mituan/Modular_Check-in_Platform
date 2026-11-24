@@ -337,7 +337,8 @@ async def get_scheduled_deadlines(cycle_id: str) -> list[datetime]:
                 else module.execution_timeout_seconds
             )
             if seconds == 0:
-                deadlines.append(fallback)
+                # The fallback must never wake the batch before the module starts.
+                deadlines.append(max(schedule.scheduled_at, fallback))
             else:
                 deadlines.append(schedule.scheduled_at + timedelta(seconds=seconds))
         return deadlines

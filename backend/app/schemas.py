@@ -328,7 +328,11 @@ class MetaOut(BaseModel):
     app_name: str
     version: str
     timezone: str
-    module_timeout: int
+    module_timeout: int = Field(
+        ...,
+        deprecated=True,
+        description="[Deprecated/Legacy] 全局超时配置；执行超时已迁移到模块级 execution_timeout_seconds",
+    )
     account_interval_min_seconds: int
     account_interval_max_seconds: int
     log_retention_days: int

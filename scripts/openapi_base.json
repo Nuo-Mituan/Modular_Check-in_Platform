@@ -828,6 +828,8 @@
             "type": "integer"
           },
           "module_timeout": {
+            "deprecated": true,
+            "description": "[Deprecated/Legacy] 全局超时配置；执行超时已迁移到模块级 execution_timeout_seconds",
             "title": "Module Timeout",
             "type": "integer"
           },
