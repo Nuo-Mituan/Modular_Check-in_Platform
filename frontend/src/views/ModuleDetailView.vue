@@ -646,6 +646,7 @@ function applyModule(detail) {
   repeatCycle.value = detail.repeat_cycle || 'daily'
   repeatSubValue.value =
     detail.repeat_sub_value || detail.default_repeat_sub_value || ''
+  executionTimeoutSeconds.value = detail.execution_timeout_seconds ?? 300
   pushIndependent.value = Boolean(detail.push_independent)
   pushUnified.value = Boolean(detail.push_unified)
   if (detail.multi_account) {

@@ -239,10 +239,12 @@ async def test_cookie_auth_security_and_modules() -> None:
                     "params": params,
                     "enabled": True,
                     "push_enabled": False,
+                    "execution_timeout_seconds": 123,
                 },
             )
             assert response.status_code == 200, response.text
             masked_detail = response.json()
+            assert masked_detail["execution_timeout_seconds"] == 123
             assert masked_detail["params"]["password"] != params["password"]
             assert "****" in masked_detail["params"]["password"]
             assert masked_detail["params"]["account"] == params["account"]
