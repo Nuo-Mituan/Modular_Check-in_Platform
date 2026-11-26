@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import inspect
 import json
@@ -325,7 +326,10 @@ class DriverRegistry:
                 module = self._load_module(key, version)
                 self._modules[key] = module
         try:
-            result = module.send(config, title, body)
+            if inspect.iscoroutinefunction(module.send):
+                result = await module.send(config, title, body)
+            else:
+                result = await asyncio.to_thread(module.send, config, title, body)
             if inspect.isawaitable(result):
                 result = await result
         except Exception as exc:

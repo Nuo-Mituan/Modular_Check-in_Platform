@@ -454,6 +454,10 @@ async def _run_one_account(
     duration_ms = int((time.perf_counter() - account_started) * 1000)
     if cancelled:
         message = "执行被取消"
+    # Still inside the outer sensitive_values context: persist/SSE/push later
+    # only see this already-redacted text.
+    message = redact_text(message)
+    error_text = redact_text(error_text)
     capture.writeline(
         f"[账号 {index}/{total}] {'成功' if success else '失败'} · "
         f"{message}（{duration_ms} ms）"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
 import sys
@@ -12,7 +13,7 @@ from ..config import settings
 from ..database import SessionLocal
 from ..models import Module, User
 from ..module_loader import SyncResult, sync_modules
-from ..security import hash_password
+from ..security import hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -21,15 +22,19 @@ async def seed_admin() -> bool:
     async with SessionLocal() as db:
         user_count = await db.scalar(select(func.count()).select_from(User))
         if user_count and user_count > 0:
-            configured = settings.admin_pass.strip()
-            if not configured or configured == "admin123":
-                admin = await db.scalar(select(User).where(User.username == (settings.admin_user or "admin")))
-                if admin is not None and not admin.password_must_change:
-                    admin.password_must_change = True
-                    await db.commit()
-                    if sys.__stdout__ is not None:
-                        sys.__stdout__.write("⚠️ [INIT] Existing admin forced to change password on next login.\n")
-                        sys.__stdout__.flush()
+            admin = await db.scalar(
+                select(User).where(User.username == (settings.admin_user or "admin"))
+            )
+            if (
+                admin is not None
+                and not admin.password_must_change
+                and await asyncio.to_thread(
+                    verify_password, "admin123", admin.password_hash or ""
+                )
+            ):
+                admin.password_must_change = True
+                await db.commit()
+                logger.warning("检测到管理员仍使用默认弱口令，已要求下次登录改密")
             return False
 
         username = (settings.admin_user or "admin").strip()[:64] or "admin"
@@ -46,7 +51,7 @@ async def seed_admin() -> bool:
         db.add(
             User(
                 username=username,
-                password_hash=hash_password(password),
+                password_hash=await asyncio.to_thread(hash_password, password),
                 password_must_change=must_change,
             )
         )

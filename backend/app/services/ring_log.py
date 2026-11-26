@@ -52,7 +52,7 @@ class RingLogStore:
         self._dropped = 0
         self._initialized = False
         self._retention_days = max(1, min(365, int(settings.log_retention_days)))
-        self._path = settings.data_dir / "checkin.db"
+        self._path = settings.sqlite_file_path or (settings.data_dir / "checkin.db")
 
     # --------------------------------------------------------------- lifecycle
     def initialize(self) -> None:

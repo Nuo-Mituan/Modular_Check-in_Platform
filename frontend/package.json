@@ -1,13 +1,13 @@
 {
   "name": "modular-checkin-platform-web",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
-    "test:unit": "node --test tests/*.test.mjs",
+    "test:unit": "node --test tests/http-error-message.test.mjs tests/icon-error-message.test.mjs tests/module-icon-error-wiring.test.mjs tests/module-icon.test.mjs tests/unified-timeout-settings.test.mjs tests/version-check.test.mjs",
     "test:component": "vitest run --config vitest.config.js",
     "test": "node --test tests/http-error-message.test.mjs tests/icon-error-message.test.mjs tests/module-icon-error-wiring.test.mjs tests/module-icon.test.mjs tests/unified-timeout-settings.test.mjs tests/version-check.test.mjs && npm run test:component"
   },

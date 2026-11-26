@@ -145,7 +145,13 @@ async def _sync_pool_rows(
         .scalars()
         .all()
     )
-    by_module = {row.module_id: row for row in existing}
+    expected_ids = {module.id for module in modules}
+    for row in existing:
+        if row.module_id not in expected_ids:
+            await db.delete(row)
+    by_module = {
+        row.module_id: row for row in existing if row.module_id in expected_ids
+    }
     for module in modules:
         if module.id in by_module:
             continue
@@ -290,6 +296,10 @@ async def apply_or_probe(
     if batch.status == BATCH_NOOP:
         set_batch_status(batch, BatchStatus.PENDING)
         batch.details_cleared = False
+        # A late result reopens the batch; make it immediately eligible for
+        # the next sweep instead of keeping the old (already passed) trigger.
+        batch.trigger_at = utcnow()
+        batch.timeout_at = None
     if batch.status in {BATCH_SENT, BATCH_TIMEOUT, BATCH_EXPIRED}:
         reason = "expired" if batch.status == BATCH_EXPIRED else "terminal"
         supplement = None
@@ -317,8 +327,7 @@ async def get_scheduled_deadlines(cycle_id: str) -> list[datetime]:
         from .push import load_unified_settings
         from .push_plan import configured_timeout_at
 
-        settings_data = await load_unified_settings(db)
-        fallback = configured_timeout_at(cycle_id, settings_data)
+        fallback: datetime | None = None
         modules = list(
             (await db.execute(select(Module).where(Module.enabled.is_(True), Module.push_unified.is_(True)).order_by(Module.id.asc()))).scalars().all()
         )
@@ -337,6 +346,9 @@ async def get_scheduled_deadlines(cycle_id: str) -> list[datetime]:
                 else module.execution_timeout_seconds
             )
             if seconds == 0:
+                if fallback is None:
+                    settings_data = await load_unified_settings(db)
+                    fallback = configured_timeout_at(cycle_id, settings_data)
                 # The fallback must never wake the batch before the module starts.
                 deadlines.append(max(schedule.scheduled_at, fallback))
             else:

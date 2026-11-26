@@ -78,7 +78,7 @@ def _started_at_epoch(value: object) -> tuple[str, int]:
 
 
 async def _migrate_td19_output(connection) -> None:
-    """Backfill legacy execution output into ring_logs, then drop the column."""
+    """Backfill legacy output, then drop the column and rebuild SQLite."""
     dialect = engine.dialect.name
     if dialect == "sqlite":
         result = await connection.exec_driver_sql("PRAGMA table_info(execution_logs)")
@@ -90,12 +90,22 @@ async def _migrate_td19_output(connection) -> None:
         columns = {row[0] for row in result.fetchall()}
     if "output" not in columns:
         return
-
     placeholder = "?" if dialect == "sqlite" else "%s"
     rows = await connection.exec_driver_sql(
-        "SELECT id, module_key, output, started_at FROM execution_logs WHERE output IS NOT NULL AND output <> ''"
+        "SELECT id, module_key, output, started_at FROM execution_logs "
+        "WHERE output IS NOT NULL AND output <> ''"
     )
-    for log_id, module_key, text, started_at in rows.fetchall():
+    await _backfill_td19_rows(connection, placeholder, rows.fetchall())
+    if dialect == "sqlite":
+        await _rebuild_td19_sqlite(connection)
+    else:
+        await connection.exec_driver_sql("ALTER TABLE execution_logs DROP COLUMN output")
+    logger.info("数据库迁移：TD-19 已回填 execution_logs.output 并删除列")
+
+
+async def _backfill_td19_rows(connection, placeholder: str, rows) -> None:
+    """Backfill legacy execution outputs into ring_logs."""
+    for log_id, module_key, text, started_at in rows:
         existing = await connection.exec_driver_sql(
             f"SELECT 1 FROM ring_logs WHERE ref_type='execution' AND ref_id={placeholder} LIMIT 1",
             (log_id,),
@@ -118,63 +128,64 @@ async def _migrate_td19_output(connection) -> None:
             (seq, "module", module_key or "unknown", "execution", "OUT", text, len(text.encode("utf-8")), created, epoch, "execution", log_id),
         )
 
-    if dialect == "sqlite":
+
+
+async def _rebuild_td19_sqlite(connection) -> None:
+    """Rebuild execution_logs without output and validate indexes/FKs."""
+    await connection.exec_driver_sql(
+        """CREATE TABLE execution_logs_new (
+            id INTEGER NOT NULL PRIMARY KEY,
+            module_id INTEGER NOT NULL,
+            module_key VARCHAR(80) NOT NULL,
+            module_name VARCHAR(120) NOT NULL,
+            trigger_type VARCHAR(16) NOT NULL,
+            status VARCHAR(16) NOT NULL,
+            message TEXT,
+            started_at DATETIME NOT NULL,
+            finished_at DATETIME,
+            duration_ms INTEGER,
+            FOREIGN KEY(module_id) REFERENCES modules (id) ON DELETE CASCADE
+        )"""
+    )
+    await connection.exec_driver_sql(
+        """INSERT INTO execution_logs_new
+           (id, module_id, module_key, module_name, trigger_type, status, message, started_at, finished_at, duration_ms)
+           SELECT id, module_id, module_key, module_name, trigger_type, status, message, started_at, finished_at, duration_ms
+           FROM execution_logs"""
+    )
+    await connection.exec_driver_sql("DROP TABLE execution_logs")
+    await connection.exec_driver_sql("ALTER TABLE execution_logs_new RENAME TO execution_logs")
+    for name, columns_sql in (
+        ("ix_execution_logs_module_id", "module_id"),
+        ("ix_execution_logs_module_key", "module_key"),
+        ("ix_execution_logs_status", "status"),
+        ("ix_execution_logs_module_started", "module_id, started_at"),
+        ("ix_execution_logs_started", "started_at"),
+    ):
         await connection.exec_driver_sql(
-            """CREATE TABLE execution_logs_new (
-                id INTEGER NOT NULL PRIMARY KEY,
-                module_id INTEGER NOT NULL,
-                module_key VARCHAR(80) NOT NULL,
-                module_name VARCHAR(120) NOT NULL,
-                trigger_type VARCHAR(16) NOT NULL,
-                status VARCHAR(16) NOT NULL,
-                message TEXT,
-                started_at DATETIME NOT NULL,
-                finished_at DATETIME,
-                duration_ms INTEGER,
-                FOREIGN KEY(module_id) REFERENCES modules (id) ON DELETE CASCADE
-            )"""
+            f'CREATE INDEX IF NOT EXISTS "{name}" ON execution_logs ({columns_sql})'
         )
-        await connection.exec_driver_sql(
-            """INSERT INTO execution_logs_new
-               (id, module_id, module_key, module_name, trigger_type, status, message, started_at, finished_at, duration_ms)
-               SELECT id, module_id, module_key, module_name, trigger_type, status, message, started_at, finished_at, duration_ms
-               FROM execution_logs"""
-        )
-        await connection.exec_driver_sql("DROP TABLE execution_logs")
-        await connection.exec_driver_sql("ALTER TABLE execution_logs_new RENAME TO execution_logs")
-        for name, columns_sql in (
-            ("ix_execution_logs_module_id", "module_id"),
-            ("ix_execution_logs_module_key", "module_key"),
-            ("ix_execution_logs_status", "status"),
-            ("ix_execution_logs_module_started", "module_id, started_at"),
-            ("ix_execution_logs_started", "started_at"),
-        ):
-            await connection.exec_driver_sql(
-                f'CREATE INDEX IF NOT EXISTS "{name}" ON execution_logs ({columns_sql})'
-            )
-        foreign_key_violations = (
-            await connection.exec_driver_sql("PRAGMA foreign_key_check")
+    foreign_key_violations = (
+        await connection.exec_driver_sql("PRAGMA foreign_key_check")
+    ).fetchall()
+    indexes = {
+        row[1]
+        for row in (
+            await connection.exec_driver_sql("PRAGMA index_list(execution_logs)")
         ).fetchall()
-        indexes = {
-            row[1]
-            for row in (
-                await connection.exec_driver_sql("PRAGMA index_list(execution_logs)")
-            ).fetchall()
-        }
-        expected_indexes = {
-            "ix_execution_logs_module_id",
-            "ix_execution_logs_module_key",
-            "ix_execution_logs_status",
-            "ix_execution_logs_module_started",
-            "ix_execution_logs_started",
-        }
-        if foreign_key_violations:
-            raise RuntimeError(f"TD-19 migration foreign key violations: {foreign_key_violations[:3]}")
-        if not expected_indexes.issubset(indexes):
-            raise RuntimeError(f"TD-19 migration missing indexes: {sorted(expected_indexes - indexes)}")
-    else:
-        await connection.exec_driver_sql("ALTER TABLE execution_logs DROP COLUMN output")
-    logger.info("数据库迁移：TD-19 已回填 execution_logs.output 并删除列")
+    }
+    expected_indexes = {
+        "ix_execution_logs_module_id",
+        "ix_execution_logs_module_key",
+        "ix_execution_logs_status",
+        "ix_execution_logs_module_started",
+        "ix_execution_logs_started",
+    }
+    if foreign_key_violations:
+        raise RuntimeError(f"TD-19 migration foreign key violations: {foreign_key_violations[:3]}")
+    if not expected_indexes.issubset(indexes):
+        raise RuntimeError(f"TD-19 migration missing indexes: {sorted(expected_indexes - indexes)}")
+
 
 
 async def _run_sqlite_td19(connection) -> None:
@@ -194,10 +205,7 @@ async def _run_sqlite_td19(connection) -> None:
 async def migrate_schema() -> None:
     """Apply forward-only schema migrations."""
     if engine.dialect.name == "sqlite":
-        # Python 3.12 sqlite3 also has autocommit; do not set autocommit=False
-        # here, or PRAGMA foreign_keys would silently become a no-op again.
-        # PRAGMA foreign_keys is a no-op inside a transaction. Toggle it on an
-        # AUTOCOMMIT connection, then run the rebuild in an explicit transaction.
+        # PRAGMA foreign_keys is a no-op inside a transaction.
         async with engine.connect() as connection:
             connection = await connection.execution_options(isolation_level="AUTOCOMMIT")
             await _run_sqlite_td19(connection)
@@ -208,175 +216,206 @@ async def migrate_schema() -> None:
         return
 
     async with engine.begin() as connection:
-        result = await connection.exec_driver_sql("PRAGMA table_info(modules)")
-        columns = {row[1] for row in result.fetchall()}
-        added: list[str] = []
-        for name, ddl_type in _LEGACY_COLUMNS.items():
-            if name in columns:
-                continue
-            await connection.exec_driver_sql(
-                f'ALTER TABLE modules ADD COLUMN "{name}" {ddl_type}'
-            )
-            added.append(name)
-        if added:
-            logger.info("数据库迁移：为 modules 添加字段 %s", ", ".join(added))
-        await connection.exec_driver_sql(
-            "UPDATE modules SET execution_timeout_seconds=300 "
-            "WHERE execution_timeout_seconds IS NULL"
-        )
+        await _migrate_module_columns(connection)
+        await _migrate_push_columns(connection)
+        await _migrate_user_columns(connection)
+        await _migrate_idempotency_columns(connection)
+    await _migrate_legacy_cycles()
 
-        result = await connection.exec_driver_sql("PRAGMA table_info(push_config)")
-        config_columns = {row[1] for row in result.fetchall()}
-        for name, ddl in (
-            ("unified_timeout_enabled", "BOOLEAN NOT NULL DEFAULT 0"),
-            ("unified_timeout_time", "VARCHAR(5) NOT NULL DEFAULT '23:30'"),
-        ):
-            if config_columns and name not in config_columns:
+
+async def _migrate_module_columns(connection) -> None:
+    """Add legacy module columns."""
+    result = await connection.exec_driver_sql("PRAGMA table_info(modules)")
+    columns = {row[1] for row in result.fetchall()}
+    added: list[str] = []
+    for name, ddl_type in _LEGACY_COLUMNS.items():
+        if name in columns:
+            continue
+        await connection.exec_driver_sql(
+            f'ALTER TABLE modules ADD COLUMN "{name}" {ddl_type}'
+        )
+        added.append(name)
+    if added:
+        logger.info("数据库迁移：为 modules 添加字段 %s", ", ".join(added))
+    await connection.exec_driver_sql(
+        "UPDATE modules SET execution_timeout_seconds=300 "
+        "WHERE execution_timeout_seconds IS NULL"
+    )
+
+
+async def _migrate_push_columns(connection) -> None:
+    """Add push batch/config columns and guards."""
+    result = await connection.exec_driver_sql("PRAGMA table_info(push_config)")
+    config_columns = {row[1] for row in result.fetchall()}
+    for name, ddl in (
+        ("unified_timeout_enabled", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("unified_timeout_time", "VARCHAR(5) NOT NULL DEFAULT '23:30'"),
+    ):
+        if config_columns and name not in config_columns:
+            await connection.exec_driver_sql(
+                f'ALTER TABLE push_config ADD COLUMN "{name}" {ddl}'
+            )
+    result = await connection.exec_driver_sql("PRAGMA table_info(push_batches)")
+    batch_columns = {row[1] for row in result.fetchall()}
+    for name, ddl in (
+        ("timeout_count", "INTEGER NOT NULL DEFAULT 0"),
+        ("trigger_at", "DATETIME"),
+        ("timeout_at", "DATETIME"),
+        ("timeout_attempted_at", "DATETIME"),
+        ("delivery_started_at", "DATETIME"),
+    ):
+        if batch_columns and name not in batch_columns:
+            await connection.exec_driver_sql(
+                f'ALTER TABLE push_batches ADD COLUMN "{name}" {ddl}'
+            )
+
+    # SQLite cannot add a CHECK constraint in-place; triggers enforce the
+    # same invariant for existing databases.
+    await connection.exec_driver_sql(
+        "CREATE TRIGGER IF NOT EXISTS trg_push_batches_status_ins "
+        "BEFORE INSERT ON push_batches "
+        "WHEN NEW.status NOT IN ('pending','sent','failed','timeout','noop','expired') "
+        "BEGIN SELECT RAISE(ABORT, 'invalid push_batches.status'); END"
+    )
+    await connection.exec_driver_sql(
+        "CREATE TRIGGER IF NOT EXISTS trg_push_batches_status_upd "
+        "BEFORE UPDATE OF status ON push_batches "
+        "WHEN NEW.status NOT IN ('pending','sent','failed','timeout','noop','expired') "
+        "BEGIN SELECT RAISE(ABORT, 'invalid push_batches.status'); END"
+    )
+
+    result = await connection.exec_driver_sql("PRAGMA table_info(push_batches)")
+    batch_columns = {row[1] for row in result.fetchall()}
+    if "deadline_at" in batch_columns:
+        # SQLite >= 3.35 supports DROP COLUMN.  The old column is unused
+        # since the trigger/timeout model replaced max-wait deadlines.
+        await connection.exec_driver_sql(
+            "ALTER TABLE push_batches DROP COLUMN deadline_at"
+        )
+        logger.info("数据库迁移：删除 push_batches.deadline_at")
+
+
+async def _migrate_user_columns(connection) -> None:
+    """Add user developer-mode column."""
+    result = await connection.exec_driver_sql("PRAGMA table_info(users)")
+    user_columns = {row[1] for row in result.fetchall()}
+    if user_columns and "developer_mode_enabled" not in user_columns:
+        await connection.exec_driver_sql(
+            "ALTER TABLE users ADD COLUMN developer_mode_enabled BOOLEAN NOT NULL DEFAULT 0"
+        )
+        logger.info("数据库迁移：为 users 添加 developer_mode_enabled")
+
+
+async def _migrate_idempotency_columns(connection) -> None:
+    """Add unique idempotency keys."""
+    # Push tables were introduced in the same release line; add columns
+    # for databases that already have them from an earlier RC build.
+    for table, columns in (  # type: ignore[assignment]  # TODO(v1.0.3): fix typing
+        ("push_batches", {"idempotency_key": "VARCHAR(120)"}),
+        ("push_records", {"idempotency_key": "VARCHAR(160)"}),
+    ):
+        result = await connection.exec_driver_sql(f"PRAGMA table_info({table})")
+        existing = {row[1] for row in result.fetchall()}
+        if not existing:
+            continue
+        for name, ddl_type in columns.items():  # type: ignore[attr-defined]  # TODO(v1.0.3): fix typing
+            if name not in existing:
                 await connection.exec_driver_sql(
-                    f'ALTER TABLE push_config ADD COLUMN "{name}" {ddl}'
+                    f'ALTER TABLE {table} ADD COLUMN "{name}" {ddl_type}'
                 )
-        result = await connection.exec_driver_sql("PRAGMA table_info(push_batches)")
-        batch_columns = {row[1] for row in result.fetchall()}
-        for name, ddl in (
-            ("timeout_count", "INTEGER NOT NULL DEFAULT 0"),
-            ("trigger_at", "DATETIME"),
-            ("timeout_at", "DATETIME"),
-            ("timeout_attempted_at", "DATETIME"),
-        ):
-            if batch_columns and name not in batch_columns:
-                await connection.exec_driver_sql(
-                    f'ALTER TABLE push_batches ADD COLUMN "{name}" {ddl}'
-                )
-
-        # SQLite cannot add a CHECK constraint in-place; triggers enforce the
-        # same invariant for existing databases.
         await connection.exec_driver_sql(
-            "CREATE TRIGGER IF NOT EXISTS trg_push_batches_status_ins "
-            "BEFORE INSERT ON push_batches "
-            "WHEN NEW.status NOT IN ('pending','sent','failed','timeout','noop','expired') "
-            "BEGIN SELECT RAISE(ABORT, 'invalid push_batches.status'); END"
-        )
-        await connection.exec_driver_sql(
-            "CREATE TRIGGER IF NOT EXISTS trg_push_batches_status_upd "
-            "BEFORE UPDATE OF status ON push_batches "
-            "WHEN NEW.status NOT IN ('pending','sent','failed','timeout','noop','expired') "
-            "BEGIN SELECT RAISE(ABORT, 'invalid push_batches.status'); END"
+            f'CREATE UNIQUE INDEX IF NOT EXISTS "ix_{table}_{list(columns)[0]}" '
+            f'ON {table} ("{list(columns)[0]}")'
         )
 
-        result = await connection.exec_driver_sql("PRAGMA table_info(push_batches)")
-        batch_columns = {row[1] for row in result.fetchall()}
-        if "deadline_at" in batch_columns:
-            # SQLite >= 3.35 supports DROP COLUMN.  The old column is unused
-            # since the trigger/timeout model replaced max-wait deadlines.
-            await connection.exec_driver_sql(
-                "ALTER TABLE push_batches DROP COLUMN deadline_at"
-            )
-            logger.info("数据库迁移：删除 push_batches.deadline_at")
 
-        result = await connection.exec_driver_sql("PRAGMA table_info(users)")
-        user_columns = {row[1] for row in result.fetchall()}
-        if user_columns and "developer_mode_enabled" not in user_columns:
-            await connection.exec_driver_sql(
-                "ALTER TABLE users ADD COLUMN developer_mode_enabled BOOLEAN NOT NULL DEFAULT 0"
-            )
-            logger.info("数据库迁移：为 users 添加 developer_mode_enabled")
+def _migrate_legacy_row(row):
+    """Mutate one module row; return (changed, migration audit strings)."""
+    legacy_start, legacy_end = _legacy_window(row.cron)
+    row_changed = False
+    migrated_cycles: list[str] = []
+    if not row.start_time:
+        row.start_time = legacy_start
+        row_changed = True
+    if not row.end_time:
+        row.end_time = legacy_end
+        row_changed = True
+    if not row.repeat_cycle:
+        row.repeat_cycle = "daily"
+        row_changed = True
+    if not row.default_start_time:
+        row.default_start_time = row.start_time
+        row_changed = True
+    if not row.default_end_time:
+        row.default_end_time = row.end_time
+        row_changed = True
+    if not row.default_repeat_cycle:
+        row.default_repeat_cycle = row.repeat_cycle
+        row_changed = True
+    if row.multi_account is None:
+        row.multi_account = False
+        row_changed = True
+    if row.push_enabled is None:
+        row.push_enabled = False
+        row_changed = True
+    if row.push_independent is None:
+        row.push_independent = bool(row.push_enabled)
+        row_changed = True
+    if row.push_unified is None:
+        row.push_unified = False
+        row_changed = True
 
-        # Push tables were introduced in the same release line; add columns
-        # for databases that already have them from an earlier RC build.
-        for table, columns in (  # type: ignore[assignment]  # TODO(v1.0.3): fix typing
-            ("push_batches", {"idempotency_key": "VARCHAR(120)"}),
-            ("push_records", {"idempotency_key": "VARCHAR(160)"}),
-        ):
-            result = await connection.exec_driver_sql(f"PRAGMA table_info({table})")
-            existing = {row[1] for row in result.fetchall()}
-            if not existing:
-                continue
-            for name, ddl_type in columns.items():  # type: ignore[attr-defined]  # TODO(v1.0.3): fix typing
-                if name not in existing:
-                    await connection.exec_driver_sql(
-                        f'ALTER TABLE {table} ADD COLUMN "{name}" {ddl_type}'
-                    )
-            await connection.exec_driver_sql(
-                f'CREATE UNIQUE INDEX IF NOT EXISTS "ix_{table}_{list(columns)[0]}" '
-                f'ON {table} ("{list(columns)[0]}")'
+    old_cycle = row.repeat_cycle or "daily"
+    old_sub = row.repeat_sub_value
+    try:
+        new_cycle, new_sub = normalize_legacy_cycle(old_cycle, old_sub)
+    except ScheduleError:
+        logger.warning(
+            "旧周期迁移失败：模块 %s 的周期 %s 无效，降级为每月 1 日",
+            row.key,
+            old_cycle,
+        )
+        new_cycle, new_sub = "monthly", "1"
+    if new_cycle != old_cycle or row.repeat_sub_value != new_sub:
+        if old_cycle in {"half_month", "quarterly"}:
+            migrated_cycles.append(f"{row.key}: {old_cycle} -> {new_cycle}/{new_sub}")
+        row.repeat_cycle = new_cycle
+        row.repeat_sub_value = new_sub
+        row_changed = True
+
+    old_default_cycle = row.default_repeat_cycle or "daily"
+    old_default_sub = row.default_repeat_sub_value
+    try:
+        new_default_cycle, new_default_sub = normalize_legacy_cycle(
+            old_default_cycle, old_default_sub
+        )
+    except ScheduleError:
+        new_default_cycle, new_default_sub = "monthly", "1"
+    if (
+        new_default_cycle != old_default_cycle
+        or row.default_repeat_sub_value != new_default_sub
+    ):
+        if old_default_cycle in {"half_month", "quarterly"}:
+            migrated_cycles.append(
+                f"{row.key} default: {old_default_cycle} -> "
+                f"{new_default_cycle}/{new_default_sub}"
             )
+        row.default_repeat_cycle = new_default_cycle
+        row.default_repeat_sub_value = new_default_sub
+        row_changed = True
+
+    return row_changed, migrated_cycles
+
+
+async def _migrate_legacy_cycles() -> None:
+    """Backfill legacy scheduling fields/cycles."""
     async with SessionLocal() as db:
         rows = (await db.execute(select(Module))).scalars().all()
         changed = 0
         migrated_cycles: list[str] = []
         for row in rows:
-            legacy_start, legacy_end = _legacy_window(row.cron)
-            row_changed = False
-            if not row.start_time:
-                row.start_time = legacy_start
-                row_changed = True
-            if not row.end_time:
-                row.end_time = legacy_end
-                row_changed = True
-            if not row.repeat_cycle:
-                row.repeat_cycle = "daily"
-                row_changed = True
-            if not row.default_start_time:
-                row.default_start_time = row.start_time
-                row_changed = True
-            if not row.default_end_time:
-                row.default_end_time = row.end_time
-                row_changed = True
-            if not row.default_repeat_cycle:
-                row.default_repeat_cycle = row.repeat_cycle
-                row_changed = True
-            if row.multi_account is None:
-                row.multi_account = False
-                row_changed = True
-            if row.push_enabled is None:
-                row.push_enabled = False
-                row_changed = True
-            if row.push_independent is None:
-                row.push_independent = bool(row.push_enabled)
-                row_changed = True
-            if row.push_unified is None:
-                row.push_unified = False
-                row_changed = True
-
-            old_cycle = row.repeat_cycle or "daily"
-            old_sub = row.repeat_sub_value
-            try:
-                new_cycle, new_sub = normalize_legacy_cycle(old_cycle, old_sub)
-            except ScheduleError:
-                logger.warning(
-                    "旧周期迁移失败：模块 %s 的周期 %s 无效，降级为每月 1 日",
-                    row.key,
-                    old_cycle,
-                )
-                new_cycle, new_sub = "monthly", "1"
-            if new_cycle != old_cycle or row.repeat_sub_value != new_sub:
-                if old_cycle in {"half_month", "quarterly"}:
-                    migrated_cycles.append(f"{row.key}: {old_cycle} -> {new_cycle}/{new_sub}")
-                row.repeat_cycle = new_cycle
-                row.repeat_sub_value = new_sub
-                row_changed = True
-
-            old_default_cycle = row.default_repeat_cycle or "daily"
-            old_default_sub = row.default_repeat_sub_value
-            try:
-                new_default_cycle, new_default_sub = normalize_legacy_cycle(
-                    old_default_cycle, old_default_sub
-                )
-            except ScheduleError:
-                new_default_cycle, new_default_sub = "monthly", "1"
-            if (
-                new_default_cycle != old_default_cycle
-                or row.default_repeat_sub_value != new_default_sub
-            ):
-                if old_default_cycle in {"half_month", "quarterly"}:
-                    migrated_cycles.append(
-                        f"{row.key} default: {old_default_cycle} -> "
-                        f"{new_default_cycle}/{new_default_sub}"
-                    )
-                row.default_repeat_cycle = new_default_cycle
-                row.default_repeat_sub_value = new_default_sub
-                row_changed = True
-
+            row_changed, row_migrations = _migrate_legacy_row(row)
+            migrated_cycles.extend(row_migrations)
             if row_changed:
                 changed += 1
         if migrated_cycles:

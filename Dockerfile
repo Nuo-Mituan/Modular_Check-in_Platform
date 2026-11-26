@@ -25,7 +25,7 @@ ENV PUID=${APP_UID} \
 
 LABEL org.opencontainers.image.title="Modular Check-in Platform" \
       org.opencontainers.image.description="Self-hosted daily check-in platform with hot-pluggable modules" \
-      org.opencontainers.image.version="1.1.0"
+      org.opencontainers.image.version="1.1.1"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -68,4 +68,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 # No USER instruction here: the entrypoint starts as root only to fix
 # bind-mount ownership, then drops to PUID/PGID before exec'ing uvicorn.
 ENTRYPOINT ["python", "/usr/local/bin/docker-entrypoint.py"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000", "--proxy-headers", "--forwarded-allow-ips", "127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 5000 --proxy-headers --forwarded-allow-ips \"${TRUSTED_PROXY_IPS:-127.0.0.1}\""]

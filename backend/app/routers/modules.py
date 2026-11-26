@@ -298,9 +298,11 @@ async def _get_module_or_404(db: AsyncSession, module_id: int) -> Module:
     return module
 
 
-def _live_config(module: Module) -> ModuleConfig:
+async def _live_config(module: Module) -> ModuleConfig:
     try:
-        return parse_config_file(get_module_physical_path(module) / "config.json")
+        return await asyncio.to_thread(
+            parse_config_file, get_module_physical_path(module) / "config.json"
+        )
     except ModuleConfigError as exc:
         raise HTTPException(
             status_code=409,
@@ -742,29 +744,23 @@ def _icon_response(
     return Response(content=data, media_type=media_type, headers=headers)
 
 
-@public_router.get("/icon", summary="读取签到模块本地图标")
-async def module_icon(
-    request: Request,
-    key: str = Query(min_length=1, max_length=80),
-    path: str = Query(default="icon.ico", min_length=1, max_length=255),
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Serve a module-local icon; directory_name comes from Module metadata."""
-    # Process-local limiter. Multi-worker deployments need a shared Redis limiter.
-    client_ip = request.client.host if request.client else "unknown"
+def _icon_rate_allowed(client_ip: str) -> bool:
     now = time.monotonic()
     _cleanup_icon_rate(now)
-    bucket = [stamp for stamp in _ICON_RATE.get(client_ip, []) if now - stamp < _ICON_RATE_WINDOW]
+    bucket = [
+        stamp for stamp in _ICON_RATE.get(client_ip, [])
+        if now - stamp < _ICON_RATE_WINDOW
+    ]
     if len(bucket) >= _ICON_RATE_LIMIT:
-        return Response(
-            content=json.dumps({"detail": "图标请求过于频繁"}).encode(),
-            status_code=429,
-            media_type="application/json",
-            headers={"Retry-After": "60"},
-        )
+        return False
     bucket.append(now)
     _ICON_RATE[client_ip] = bucket
+    return True
 
+
+async def _resolve_icon_candidate(
+    db: AsyncSession, key: str, path: str
+) -> Path:
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", key):
         raise HTTPException(status_code=400, detail="模块标识不合法")
     module = await db.scalar(select(Module).where(Module.key == key))
@@ -772,13 +768,8 @@ async def module_icon(
     try:
         validate_module_key(directory)
     except ModuleConfigError as exc:
-        logger.warning(
-            "模块图标目录映射非法：key=%s directory=%r", key, directory
-        )
-        raise HTTPException(
-            status_code=403,
-            detail="模块标识不合法",
-        ) from exc
+        logger.warning("模块图标目录映射非法：key=%s directory=%r", key, directory)
+        raise HTTPException(status_code=403, detail="模块标识不合法") from exc
     if "\x00" in path or "\\" in path or path.startswith("/"):
         raise HTTPException(status_code=400, detail="图标路径不合法")
     from pathlib import PurePosixPath
@@ -795,6 +786,26 @@ async def module_icon(
     if not candidate.is_relative_to(module_root):
         logger.warning("拒绝模块图标路径越界：%s/%s", key, path)
         raise HTTPException(status_code=403, detail="图标路径不合法")
+    return candidate
+
+
+@public_router.get("/icon", summary="读取签到模块本地图标")
+async def module_icon(
+    request: Request,
+    key: str = Query(min_length=1, max_length=80),
+    path: str = Query(default="icon.ico", min_length=1, max_length=255),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Serve a module-local icon; directory_name comes from Module metadata."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not _icon_rate_allowed(client_ip):
+        return Response(
+            content=json.dumps({"detail": "图标请求过于频繁"}).encode(),
+            status_code=429,
+            media_type="application/json",
+            headers={"Retry-After": "60"},
+        )
+    candidate = await _resolve_icon_candidate(db, key, path)
 
     try:
         current_mtime = await asyncio.to_thread(
@@ -817,11 +828,7 @@ async def module_icon(
             else:
                 loop = asyncio.get_running_loop()
                 data, media_type, mtime_ns = await asyncio.wait_for(
-                    loop.run_in_executor(
-                        pool,
-                        _tracked_load_icon,
-                        candidate,
-                    ),
+                    loop.run_in_executor(pool, _tracked_load_icon, candidate),
                     timeout=_ICON_DECODE_TIMEOUT,
                 )
                 cache_key = (str(candidate.resolve()), mtime_ns)
@@ -847,7 +854,6 @@ async def module_icon(
             headers={"Cache-Control": "no-store"},
         )
     return _icon_response(request, data, media_type, current_mtime)
-
 
 @router.get("/{module_id}/icon", summary="代理远程模块图标")
 async def module_remote_icon(
@@ -909,7 +915,9 @@ async def reveal_sensitive(
             raise HTTPException(status_code=404, detail="用户不存在")
         if module is None:
             raise HTTPException(status_code=404, detail="模块不存在")
-        if not verify_password(payload.current_password, stored_user.password_hash):
+        if not await asyncio.to_thread(
+            verify_password, payload.current_password, stored_user.password_hash
+        ):
             sensitive_limiter.record_failure(user_id)
             raise HTTPException(status_code=400, detail="当前密码不正确")
         sensitive_limiter.reset(user_id)
@@ -999,7 +1007,7 @@ async def update_module(
     db: AsyncSession = Depends(get_db),
 ) -> ModuleDetail:
     module = await _get_module_or_404(db, module_id)
-    config = _live_config(module)
+    config = await _live_config(module)
     if isinstance(config.icon, str) and config.icon.startswith(("http://", "https://")):
         try:
             normalize_remote_url(config.icon, field_label="模块图标")
@@ -1064,7 +1072,7 @@ async def toggle_module(
     db: AsyncSession = Depends(get_db),
 ) -> ModuleOut:
     module = await _get_module_or_404(db, module_id)
-    config = _live_config(module)
+    config = await _live_config(module)
     context = EncryptionContext(
         user_id=await owner_user_id(db), module_key=module.key, account_index=-1
     )
@@ -1192,7 +1200,7 @@ async def delete_module(
         if physical.exists():
             trash_path = physical.parent / f".trash-{key}-{uuid.uuid4().hex[:8]}"
             try:
-                physical.rename(trash_path)
+                await asyncio.to_thread(physical.rename, trash_path)
             except OSError as exc:
                 logger.exception("模块目录暂存失败：key=%s", key)
                 raise HTTPException(status_code=500, detail="无法移动模块目录，删除已取消") from exc
@@ -1207,7 +1215,7 @@ async def delete_module(
         await db.rollback()
         if trash_path is not None and trash_path.exists() and physical_path is not None:
             try:
-                trash_path.rename(physical_path)
+                await asyncio.to_thread(trash_path.rename, physical_path)
             except OSError:
                 logger.exception("数据库删除失败且无法恢复模块目录：%s", trash_path)
         logger.exception("模块硬删除失败：key=%s", key)
@@ -1216,7 +1224,7 @@ async def delete_module(
     cleanup_failed = False
     if trash_path is not None:
         try:
-            shutil.rmtree(trash_path)
+            await asyncio.to_thread(shutil.rmtree, trash_path)
         except OSError:
             cleanup_failed = True
             logger.exception("模块数据库已删除，但物理目录清理失败：%s", trash_path)

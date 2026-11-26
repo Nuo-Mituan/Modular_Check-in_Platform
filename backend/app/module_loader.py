@@ -1198,7 +1198,7 @@ async def sync_modules(db: AsyncSession) -> SyncResult:
 
 
 async def _sync_modules_locked(db: AsyncSession) -> SyncResult:
-    scanned = scan_modules()
+    scanned = await asyncio.to_thread(scan_modules)
     scanned_keys = {item.key for item in scanned}
     result = SyncResult()
     seen: set[str] = set()
@@ -1501,10 +1501,11 @@ def load_runner(key: str, directory_name: str | None = None) -> LoadedRunner:
 
     package_name = f"_checkin_pkg_{re.sub(r'[^A-Za-z0-9_]', '_', key)}_{uuid.uuid4().hex}"
     inserted_sys_path = str(module_dir) not in sys.path
-    if inserted_sys_path:
-        sys.path.insert(0, str(module_dir))
-
     try:
+        if inserted_sys_path:
+            # Scope the path to module import only; runtime imports must use
+            # relative imports so concurrent modules cannot shadow each other.
+            sys.path.insert(0, str(module_dir))
         spec = importlib.util.spec_from_file_location(
             package_name,
             main_path,
@@ -1525,18 +1526,19 @@ def load_runner(key: str, directory_name: str | None = None) -> LoadedRunner:
             module_dir=module_dir,
             module=module,
             run=run,
-            inserted_sys_path=inserted_sys_path,
+            inserted_sys_path=False,
         )
     except Exception:
         for loaded_name in list(sys.modules):
             if loaded_name == package_name or loaded_name.startswith(package_name + "."):
                 sys.modules.pop(loaded_name, None)
+        raise
+    finally:
         if inserted_sys_path:
             try:
                 sys.path.remove(str(module_dir))
             except ValueError:
                 pass
-        raise
 
 
 def unload_runner(runner: LoadedRunner) -> None:

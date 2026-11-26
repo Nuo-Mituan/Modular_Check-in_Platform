@@ -36,7 +36,9 @@ def _enable_sqlite_wal() -> None:
     """WAL greatly improves read/write concurrency for this small SQLite app."""
     if not settings.sqlalchemy_url.startswith("sqlite"):
         return
-    db_file = settings.data_dir / "checkin.db"
+    db_file = settings.sqlite_file_path
+    if db_file is None:
+        return
     try:
         connection = sqlite3.connect(db_file, timeout=10)
         try:
@@ -68,8 +70,10 @@ def _secure_sqlite_files() -> None:
     """SQLite stores passwords/cookies-adjacent data; keep it owner-only."""
     if not settings.sqlalchemy_url.startswith("sqlite"):
         return
-    for name in ("checkin.db", "checkin.db-wal", "checkin.db-shm"):
-        path = settings.data_dir / name
+    db_file = settings.sqlite_file_path
+    if db_file is None:
+        return
+    for path in (db_file, db_file.with_name(db_file.name + "-wal"), db_file.with_name(db_file.name + "-shm")):
         try:
             if path.exists():
                 path.chmod(0o600)

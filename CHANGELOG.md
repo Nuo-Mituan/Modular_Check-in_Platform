@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.1.1] - 2026-11-26
+
+### Fixed
+
+- 管理员强密码不再在重启时被重置为必须改密。
+- 统一推送兜底失败不再触发 failed→failed 非法跃迁或重复发送。
+- 账号返回消息在敏感上下文中完成精确脱敏。
+- 发布脚本恢复 git_commit 溯源。
+
+### Security / Async
+
+- PBKDF2 校验移出事件循环；自定义驱动同步 send 移入线程。
+- 可信代理默认仅 127.0.0.1，支持 TRUSTED_PROXY_IPS。
+- 多账号模块拒绝 Chrome 同步。
+- SQLite WAL/权限/ring 路径按 DATABASE_URL 解析。
+- 模块导入临时 sys.path，导入后立即移除。
+
+### Unified Push
+
+- noop 批次重开时重置触发时间。
+- 移除模块的池明细置为 skipped。
+- outbox 达到最大尝试次数进入 dead 终态。
+
+
 ## [1.0.6] - 2026-10-31
 
 ### Removed

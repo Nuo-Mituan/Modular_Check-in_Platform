@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import re
@@ -93,8 +94,8 @@ def _login_too_many(retry_after: int) -> HTTPException:
     )
 
 
-def _verify_current_password(user_id: int, password: str, stored_hash: str) -> None:
-    if not verify_password(password, stored_hash):
+async def _verify_current_password(user_id: int, password: str, stored_hash: str) -> None:
+    if not await asyncio.to_thread(verify_password, password, stored_hash):
         sensitive_limiter.record_failure(user_id)
         raise HTTPException(status_code=400, detail="当前密码不正确")
     sensitive_limiter.reset(user_id)
@@ -138,12 +139,12 @@ async def login(
         await _login_record_failure(None, ip)
         # Keep the failure path close to a real password verification to reduce
         # username-enumeration through response timing.
-        verify_password(payload.password, DUMMY_PASSWORD_HASH)
+        await asyncio.to_thread(verify_password, payload.password, DUMMY_PASSWORD_HASH)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
         )
-    if not verify_password(payload.password, user.password_hash):
+    if not await asyncio.to_thread(verify_password, payload.password, user.password_hash):
         await _login_record_failure(user.id, ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -248,7 +249,7 @@ async def update_username(
         stored_user = await db.get(User, user_id)
         if stored_user is None:
             raise HTTPException(status_code=404, detail="用户不存在")
-        _verify_current_password(
+        await _verify_current_password(
             stored_user.id, payload.current_password, stored_user.password_hash
         )
 
@@ -294,7 +295,7 @@ async def change_password(
         stored_user = await db.get(User, user_id)
         if stored_user is None:
             raise HTTPException(status_code=404, detail="用户不存在")
-        _verify_current_password(
+        await _verify_current_password(
             stored_user.id, payload.old_password, stored_user.password_hash
         )
 
@@ -305,7 +306,7 @@ async def change_password(
         if len(payload.new_password) < 6:
             raise HTTPException(status_code=400, detail="新密码长度不能少于 6 位")
 
-        stored_user.password_hash = hash_password(payload.new_password)
+        stored_user.password_hash = await asyncio.to_thread(hash_password, payload.new_password)
         stored_user.password_must_change = False
         await invalidate_all_sessions(db, stored_user.id)
         await db.commit()

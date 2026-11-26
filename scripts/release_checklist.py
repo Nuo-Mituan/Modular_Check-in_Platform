@@ -85,6 +85,11 @@ def main() -> int:
         push("manifest_covered", "  MANIFEST.json" in sha_text, "MANIFEST.json not covered")
         push("manifest_no_self", "  MANIFEST.sha256" not in sha_text, "MANIFEST.sha256 must not hash itself")
         push("dist_included", bool(manifest.get("dist_included")), "manifest does not include dist")
+        push(
+            "manifest_git_commit",
+            manifest.get("git_commit") not in (None, "", "unknown"),
+            "manifest.git_commit is missing or unknown",
+        )
         push("stale_dist_allowed", not manifest.get("stale_dist_allowed"), "stale dist is not allowed")
         push("dist_count", int(manifest.get("dist_file_count", 0)) == len(dist_files), f"dist count {len(dist_files)} != manifest {manifest.get('dist_file_count')}")
         sha_run = subprocess.run(

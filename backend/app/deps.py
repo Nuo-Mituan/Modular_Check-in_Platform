@@ -69,12 +69,13 @@ async def get_auth_context(
         raise _unauthorized()
 
     if user.password_must_change:
+        prefix = settings.api_prefix.rstrip("/")
         allowed = {
-            "/api/auth/logout",
-            "/api/auth/logout-all",
-            "/api/auth/change-password",
-            "/api/auth/session",
-            "/api/auth/me",
+            f"{prefix}/auth/logout",
+            f"{prefix}/auth/logout-all",
+            f"{prefix}/auth/change-password",
+            f"{prefix}/auth/session",
+            f"{prefix}/auth/me",
         }
         if request.url.path not in allowed:
             raise HTTPException(

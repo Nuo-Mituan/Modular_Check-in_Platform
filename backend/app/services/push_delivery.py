@@ -15,6 +15,7 @@ unified-push state machine.
 from __future__ import annotations
 import asyncio
 import json
+import secrets
 import time as clock
 import logging
 from dataclasses import dataclass
@@ -86,17 +87,17 @@ async def _send_supplement(
     cycle_id: str,
     status: str,
     message: str,
-) -> None:
+) -> bool:
     if settings.push_after_flush_mode != "single":
-        return
+        return True
     try:
         async with SessionLocal() as db:
             config = await load_push_config(db)
     except PushConfigError as exc:
         logger.warning("补发单条读取推送配置失败：%s", exc)
-        return
+        return False
     if config["channel"] == "none":
-        return
+        return False
     variables = {
         "event": EVENT_LABELS.get("success" if status == "success" else "failure", status),
         "module_name": module_name,
@@ -112,9 +113,7 @@ async def _send_supplement(
     }
     title = render_template(config["title_template"], variables)  # type: ignore[arg-type]  # TypedDict value invariance; runtime only reads
     body = render_template(config["body_template"], variables)  # type: ignore[arg-type]  # TypedDict value invariance; runtime only reads
-    key = make_idempotency_key(
-        "supplement", cycle_id, module_id, message, clock.time_ns()
-    )
+    key = make_idempotency_key("supplement", cycle_id, module_id, message, clock.time_ns())
     async with SessionLocal() as db:
         record = PushRecord(
             kind="supplement",
@@ -141,7 +140,8 @@ async def _send_supplement(
     async with SessionLocal() as db:
         stored = await db.get(PushRecord, record_id)
         if stored is not None:
-            stored.status = "success" if result.get("sent") else "failed"
+            # Keep failed supplements pending for recover_pending_supplements.
+            stored.status = "success" if result.get("sent") else "pending"
             stored.response = redact_text(
                 json.dumps(result, ensure_ascii=False)[: settings.push_response_max_chars]
             )
@@ -159,6 +159,9 @@ async def _send_supplement(
         ),
         "INFO" if result.get("sent") else "ERROR",
     )
+    return bool(result.get("sent"))
+
+
 async def recover_pending_supplements() -> int:
     """Re-send stale pending supplement records with short transactions."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
@@ -207,9 +210,21 @@ async def recover_pending_supplements() -> int:
                 if result.get("sent"):
                     row.status = "success"
                     row.error = None
+                    await db.execute(
+                        delete(PushPool).where(
+                            PushPool.cycle_id == row.cycle_id,
+                            PushPool.module_id == row.module_id,
+                        )
+                    )
                 elif datetime.now(timezone.utc) - created_at > timedelta(hours=24):
                     row.status = "failed"
                     row.error = redact_text(str(result.get("error") or "重发超过 24 小时"))
+                    await db.execute(
+                        delete(PushPool).where(
+                            PushPool.cycle_id == row.cycle_id,
+                            PushPool.module_id == row.module_id,
+                        )
+                    )
                 await db.commit()
             retried += 1
         except Exception:
@@ -226,14 +241,23 @@ async def _supplement_after_flush(
     trigger: str,
     status: str,
     message: str,
-) -> None:
-    """Manual executions are deliberately excluded from all push paths."""
+) -> bool:
+    """Return True only when the late result was actually delivered.
+
+    mode=none intentionally sends nothing, so callers must keep the pool row
+    instead of treating the result as consumed.
+    """
     if trigger != "schedule":
-        return
+        return False
     if settings.push_after_flush_mode == "single":
-        await _send_supplement(
+        return await _send_supplement(
             module_id, module_key, module_name, cycle_id, status, message
         )
+    logger.warning(
+        "push_after_flush_mode=none：迟到结果保留池明细 cycle=%s module=%s",
+        cycle_id, module_key,
+    )
+    return False
 # ---------------------------------------------------------------------------
 # Main / timeout flush execution
 # ---------------------------------------------------------------------------
@@ -248,32 +272,98 @@ async def _load_push_config() -> dict[str, object]:
         return {"channel": "none", "config": {}}
 
 
-async def flush_batch(
-    cycle_id: str | None = None, *, mode: str = FLUSH_MAIN
-) -> bool:
-    """Main trigger or timeout fallback; never auto-flushes on result arrival."""
-    cycle_id = cycle_id or cycle_id_for()
-    config = await _load_push_config()
+async def _complete_noop(db, batch, rows) -> bool:
+    """Return True when the batch is empty/all-skipped and already finalized."""
+    from .push_state import _mark_noop
+
+    if not rows:
+        noop_event = await _mark_noop(db, batch, [])
+        batch.summary = render_summary(batch.cycle_id, [], {
+            "success": 0, "failed": 0, "skipped": 0, "pending": 0, "timeout": 0,
+        })
+        enqueue_outbox(
+            db,
+            idempotency_key=make_idempotency_key("outbox-noop", noop_event["cycle_id"]),
+            kind="noop",
+            message=f"空批次无需推送 cycle={noop_event['cycle_id']}",
+        )
+    elif not any(row.status != POOL_SKIPPED for row in rows):
+        summary = render_summary(batch.cycle_id, rows, {
+            "success": 0, "failed": 0, "skipped": len(rows), "pending": 0, "timeout": 0,
+        })
+        noop_event = await _mark_noop(db, batch, rows)
+        batch.summary = summary
+        enqueue_outbox(
+            db,
+            idempotency_key=make_idempotency_key("outbox-noop", noop_event["cycle_id"]),
+            kind="noop",
+            message=(
+                f"全 skip 批次无需推送 cycle={noop_event['cycle_id']} "
+                f"skipped={noop_event['skipped']}"
+            ),
+        )
+    else:
+        return False
+    await db.commit()
+    await drain_outbox()
+    return True
+
+
+def _delivery_lease_seconds() -> float:
+    attempts = max(1, int(settings.push_retry_attempts))
+    return float(settings.push_http_timeout_seconds * attempts + 120)
+
+
+def _is_stale_claim(value: datetime | None, now: datetime) -> bool:
+    if value is None:
+        return False
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return (now - value).total_seconds() > _delivery_lease_seconds()
+
+
+def _pool_counts(rows) -> dict[str, int]:
+    return {
+        "success": sum(1 for row in rows if row.status == POOL_SUCCESS),
+        "failed": sum(1 for row in rows if row.status == POOL_FAILED),
+        "skipped": sum(1 for row in rows if row.status == POOL_SKIPPED),
+        "timeout": sum(1 for row in rows if row.status == POOL_TIMEOUT),
+    }
+
+
+async def _prepare_flush(
+    cycle_id: str, mode: str, config: dict[str, object]
+) -> tuple[int, dict[str, int], str, str] | None:
+    """Locked phase: validate, mark pending rows, persist summary and claim."""
     async with _lock(cycle_id):
         async with SessionLocal() as db:
             batch = await db.scalar(
                 select(PushBatch).where(PushBatch.cycle_id == cycle_id)
             )
             if batch is None:
-                return False
+                return None
             now = datetime.now(timezone.utc)
             if mode == FLUSH_MAIN:
                 if batch.status != BATCH_PENDING:
-                    return False
+                    return None
                 if batch.trigger_at is not None and now < batch.trigger_at.astimezone(timezone.utc):
-                    return False
+                    return None
+                if batch.delivery_started_at is not None:
+                    if not _is_stale_claim(batch.delivery_started_at, now):
+                        return None
+                    logger.warning("接管过期发送占用 cycle=%s age_claim=%s", cycle_id, batch.delivery_started_at)
+                    batch.delivery_started_at = None
+                    batch.delivery_claim_token = None
             else:
                 if batch.status in {BATCH_SENT, BATCH_TIMEOUT, BATCH_EXPIRED}:
-                    return False
+                    return None
                 if batch.timeout_attempted_at is not None:
-                    return False
+                    if not _is_stale_claim(batch.timeout_attempted_at, now):
+                        return None
+                    logger.warning("接管过期兜底占用 cycle=%s age_claim=%s", cycle_id, batch.timeout_attempted_at)
+                    batch.timeout_attempted_at = None
                 if batch.timeout_at is None or now < batch.timeout_at.astimezone(timezone.utc):
-                    return False
+                    return None
             rows = (
                 (
                     await db.execute(
@@ -285,47 +375,8 @@ async def flush_batch(
                 .scalars()
                 .all()
             )
-            if not rows:
-                from .push_state import _mark_noop
-                noop_event = await _mark_noop(db, batch, [])
-                batch.summary = render_summary(batch.cycle_id, [], {
-                    "success": 0, "failed": 0, "skipped": 0,
-                    "pending": 0, "timeout": 0,
-                })
-                enqueue_outbox(
-                    db,
-                    idempotency_key=make_idempotency_key(
-                        "outbox-noop", noop_event["cycle_id"]
-                    ),
-                    kind="noop",
-                    message=f"空批次无需推送 cycle={noop_event['cycle_id']}",
-                )
-                await db.commit()
-                await drain_outbox()
-                return False
-            has_executing = any(row.status != POOL_SKIPPED for row in rows)
-            if not has_executing:
-                from .push_state import _mark_noop
-                noop_summary = render_summary(batch.cycle_id, rows, {
-                    "success": 0, "failed": 0, "skipped": len(rows),
-                    "pending": 0, "timeout": 0,
-                })
-                noop_event = await _mark_noop(db, batch, rows)
-                batch.summary = noop_summary
-                enqueue_outbox(
-                    db,
-                    idempotency_key=make_idempotency_key(
-                        "outbox-noop", noop_event["cycle_id"]
-                    ),
-                    kind="noop",
-                    message=(
-                        f"全 skip 批次无需推送 cycle={noop_event['cycle_id']} "
-                        f"skipped={noop_event['skipped']}"
-                    ),
-                )
-                await db.commit()
-                await drain_outbox()
-                return False
+            if await _complete_noop(db, batch, rows):
+                return None
             pending = [row for row in rows if row.status == POOL_PENDING]
             if pending:
                 for row in pending:
@@ -349,14 +400,89 @@ async def flush_batch(
                     .scalars()
                     .all()
                 )
-            counts = {
-                "success": sum(1 for row in rows if row.status == POOL_SUCCESS),
-                "failed": sum(1 for row in rows if row.status == POOL_FAILED),
-                "skipped": sum(1 for row in rows if row.status == POOL_SKIPPED),
-                "timeout": sum(1 for row in rows if row.status == POOL_TIMEOUT),
-            }
-            await _flush_locked(db, batch, rows, counts, mode, config)
-            return True
+            counts = _pool_counts(rows)
+            summary = render_summary(batch.cycle_id, rows, counts, timeout=mode == FLUSH_TIMEOUT)
+            await _persist_summary(db, batch, counts, summary)
+            claim_token = secrets.token_hex(16)
+            batch.delivery_started_at = utcnow()
+            batch.delivery_claim_token = claim_token
+            if mode == FLUSH_TIMEOUT:
+                batch.timeout_attempted_at = utcnow()
+            await db.commit()
+            return batch.id, counts, summary, claim_token
+
+
+async def flush_batch(
+    cycle_id: str | None = None, *, mode: str = FLUSH_MAIN
+) -> bool:
+    """Prepare under the cycle lock, send HTTP outside it, then finalize under lock."""
+    cycle_id = cycle_id or cycle_id_for()
+    config = await _load_push_config()
+    prepared = await _prepare_flush(cycle_id, mode, config)
+    if prepared is None:
+        return False
+    batch_id, counts, summary, claim_token = prepared
+    async with SessionLocal() as db:
+        batch = await db.get(PushBatch, batch_id)
+        if batch is None or batch.status not in {BATCH_PENDING, BATCH_FAILED}:
+            return False
+        _config, result = await _send_summary(
+            db, batch, summary, config=config, timeout=mode == FLUSH_TIMEOUT
+        )
+    late_rows: list[tuple[int, int, str, str, str, str]] = []
+    async with _lock(cycle_id):
+        async with SessionLocal() as db:
+            batch = await db.get(PushBatch, batch_id)
+            if batch is None or batch.delivery_claim_token != claim_token:
+                logger.warning("忽略失去发送租约的批次 cycle=%s", cycle_id)
+                return False
+            claim_at = batch.delivery_started_at
+            await _finalize_flush(
+                db, batch, counts, summary, _config, result, mode=mode
+            )
+            if claim_at is not None:
+                late = (
+                    await db.execute(
+                        select(PushPool).where(
+                            PushPool.cycle_id == cycle_id,
+                            PushPool.updated_at > claim_at,
+                        )
+                    )
+                ).scalars().all()
+                late_rows = [
+                    (row.id, row.module_id, row.module_key, row.module_name,
+                     row.status, row.message or row.details or "")
+                    for row in late
+                ]
+    sent_ids: list[int] = []
+    for row_id, module_id, module_key, module_name, status, message in late_rows:
+        handled = await _supplement_after_flush(
+            module_id, module_key, module_name, cycle_id,
+            "schedule", status, message,
+        )
+        if handled:
+            sent_ids.append(row_id)
+        else:
+            logger.error("迟到结果补发失败，保留池明细 id=%s cycle=%s", row_id, cycle_id)
+            async with SessionLocal() as outbox_db:
+                enqueue_outbox(
+                    outbox_db,
+                    idempotency_key=make_idempotency_key(
+                        "late-supplement-failed", cycle_id, row_id
+                    ),
+                    kind="supplement_failed",
+                    message=f"迟到结果补发失败 cycle={cycle_id} pool_id={row_id}",
+                )
+                await outbox_db.commit()
+    if sent_ids:
+        async with SessionLocal() as db:
+            await db.execute(
+                delete(PushPool).where(PushPool.id.in_(sent_ids))
+            )
+            await db.commit()
+    return True
+
+
 async def maybe_flush_batch(cycle_id: str | None = None) -> bool:
     """Backward-compatible main flush; only runs after trigger_at."""
     return await flush_batch(cycle_id, mode=FLUSH_MAIN)
@@ -481,6 +607,12 @@ async def _send_summary(
 # The state module still owns all status writes through set_batch_status.
 
 
+def _flush_title(cycle_id: str, timeout: bool) -> str:
+    if timeout:
+        return f"⚠️ 部分模块推送超时（兜底触发）｜{cycle_id}"
+    return f"签到日报｜{cycle_id}"
+
+
 async def _finalize_flush(
     db: AsyncSession,
     batch: PushBatch,
@@ -494,8 +626,11 @@ async def _finalize_flush(
     timeout = mode == FLUSH_TIMEOUT
     success = result.sent
     if timeout:
-        batch.timeout_attempted_at = utcnow()
-        set_batch_status(batch, BatchStatus.TIMEOUT if success else BatchStatus.FAILED)
+        batch.timeout_attempted_at = batch.timeout_attempted_at or utcnow()
+        if success:
+            set_batch_status(batch, BatchStatus.TIMEOUT)
+        elif batch.status != BatchStatus.FAILED:
+            set_batch_status(batch, BatchStatus.FAILED)
     else:
         set_batch_status(batch, BatchStatus.SENT if success else BatchStatus.FAILED)
     batch.flushed_at = utcnow()
@@ -508,11 +643,7 @@ async def _finalize_flush(
             str(result.error or result.reason or "汇总推送失败")
         )
         batch.details_cleared = False
-    title = (
-        f"⚠️ 部分模块推送超时（兜底触发）｜{batch.cycle_id}"
-        if timeout
-        else f"签到日报｜{batch.cycle_id}"
-    )
+    title = _flush_title(batch.cycle_id, timeout)
     db.add(
         PushRecord(
             kind="unified",
@@ -546,7 +677,10 @@ async def _finalize_flush(
         ),
     )
     if success or timeout:
-        await db.execute(delete(PushPool).where(PushPool.cycle_id == batch.cycle_id))
+        stmt = delete(PushPool).where(PushPool.cycle_id == batch.cycle_id)
+        if batch.delivery_started_at is not None:
+            stmt = stmt.where(PushPool.updated_at <= batch.delivery_started_at)
+        await db.execute(stmt)
     await db.commit()
     await drain_outbox()
     await asyncio.to_thread(
@@ -577,6 +711,14 @@ class FlushStats:
         return self.sent + self.noop + self.expired + self.failed
 
 
+def _count_cleanup_events(events: list[dict[str, object]], stats: FlushStats) -> None:
+    for event in events:
+        if event["kind"] == "noop":
+            stats.noop += 1
+        else:
+            stats.expired += 1
+
+
 async def flush_due_batches() -> FlushStats:
     """Sweep persisted batches and execute due main/timeout deliveries."""
     await drain_outbox()
@@ -585,11 +727,7 @@ async def flush_due_batches() -> FlushStats:
     events = await cleanup_cross_day_pending()
     stats = FlushStats()
     if events:
-        for event in events:
-            if event["kind"] == "noop":
-                stats.noop += 1
-            else:
-                stats.expired += 1
+        _count_cleanup_events(events, stats)
         await drain_outbox()
     batches = await get_due_and_expire_batches()
     for batch, all_skipped in batches:

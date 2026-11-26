@@ -128,6 +128,8 @@ async def module_supports_chrome(
     config: ModuleConfig | None = None,
     persist_schema: bool = False,
 ) -> bool:
+    if module.multi_account:
+        return False
     if config is None:
         config = await _load_config(module, persist_schema=persist_schema)
     supported = _supports_config(config)
@@ -150,7 +152,7 @@ async def _write_module_version(
 ) -> bool:
     if config is None:
         config = await _load_config(module, persist_schema=True)
-    supported = _supports_config(config)
+    supported = bool(not module.multi_account and _supports_config(config))
     _cache_supported(module, supported)
     if not supported:
         return False

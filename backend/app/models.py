@@ -365,6 +365,8 @@ class PushBatch(Base):
     trigger_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     timeout_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     timeout_attempted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    delivery_started_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    delivery_claim_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_attempt_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     flushed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 

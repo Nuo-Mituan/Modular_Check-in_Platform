@@ -147,7 +147,6 @@ def main() -> int:
 
     checklist = None
     if args.checklist_json is not None:
-        import subprocess
         checklist_path = args.checklist_json.resolve()
         result = subprocess.run([
             os.sys.executable, str(ROOT / "scripts" / "release_checklist.py"),

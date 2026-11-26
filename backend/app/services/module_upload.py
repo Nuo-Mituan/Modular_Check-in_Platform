@@ -258,8 +258,12 @@ async def install_module_upload(
         raise ModuleUploadError("目前仅支持上传 .zip 格式的模块压缩包")
 
     max_bytes = settings.upload_max_mb * 1024 * 1024
-    temp_file = tempfile.NamedTemporaryFile(
-        prefix="module-upload-", suffix=".zip", dir=str(settings.data_dir), delete=False
+    temp_file = await asyncio.to_thread(
+        tempfile.NamedTemporaryFile,
+        prefix="module-upload-",
+        suffix=".zip",
+        dir=str(settings.data_dir),
+        delete=False,
     )
     temp_path = Path(temp_file.name)
     total = 0
@@ -273,8 +277,8 @@ async def install_module_upload(
                 raise ModuleUploadError(
                     f"压缩包超过 {settings.upload_max_mb} MB 上传限制"
                 )
-            temp_file.write(chunk)
-        temp_file.close()
+            await asyncio.to_thread(temp_file.write, chunk)
+        await asyncio.to_thread(temp_file.close)
         if total == 0:
             raise ModuleUploadError("上传的文件为空")
         return await asyncio.to_thread(
@@ -286,9 +290,9 @@ async def install_module_upload(
             directory_name,
         )
     finally:
-        _close_quietly(temp_file)
+        await asyncio.to_thread(_close_quietly, temp_file)
         try:
-            temp_path.unlink(missing_ok=True)
+            await asyncio.to_thread(temp_path.unlink, missing_ok=True)
         except OSError:
             pass
 

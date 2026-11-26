@@ -27,6 +27,7 @@ class LatestRelease:
 _lock = threading.Lock()
 _cached_release: LatestRelease | None = None
 _cached_at = 0.0
+_refresh_event: threading.Event | None = None
 
 
 def _fetch_release() -> LatestRelease | None:
@@ -57,14 +58,31 @@ def _fetch_release() -> LatestRelease | None:
 
 
 def _cached_release_sync() -> LatestRelease | None:
-    global _cached_release, _cached_at
+    global _cached_release, _cached_at, _refresh_event
     with _lock:
         ttl = SUCCESS_TTL if _cached_release is not None else FAILURE_TTL
         if _cached_at and time.monotonic() - _cached_at < ttl:
             return _cached_release
-        _cached_release = _fetch_release()
-        _cached_at = time.monotonic()
-        return _cached_release
+        if _refresh_event is not None:
+            event = _refresh_event
+            owner = False
+        else:
+            event = _refresh_event = threading.Event()
+            owner = True
+    if not owner:
+        event.wait(timeout=6)
+        with _lock:
+            return _cached_release
+    release: LatestRelease | None = None
+    try:
+        release = _fetch_release()
+    finally:
+        with _lock:
+            _cached_release = release
+            _cached_at = time.monotonic()
+            _refresh_event = None
+            event.set()
+    return release
 
 
 async def get_latest_release() -> LatestRelease | None:

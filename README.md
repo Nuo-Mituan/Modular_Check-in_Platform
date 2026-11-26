@@ -1,11 +1,10 @@
 # 签到云台 · Modular Check-in Platform
 
-> ## v1.1.0
+> ## v1.1.1
 >
-> v1.1.0 新增模块级执行超时设置：每个模块可独立设置执行超时时间，统一推送主触发等待时间使用该模块的超时值。
+> v1.1.1 包含执行超时、统一推送、安全与异步修复。
 >
-> - 变更说明：[docs/RELEASE_NOTES_v1.1.0.md](docs/RELEASE_NOTES_v1.1.0.md)
-> - 发布与变更管制：[docs/RELEASE_POLICY.md](docs/RELEASE_POLICY.md)
+> - 变更说明：[docs/RELEASE_NOTES_v1.1.1.md](docs/RELEASE_NOTES_v1.1.1.md)
 > - 发布与变更管制：[docs/RELEASE_POLICY.md](docs/RELEASE_POLICY.md)
 > - Docker 验证 SOP：[docs/DOCKER_GATE_SOP.md](docs/DOCKER_GATE_SOP.md)
 > - 统一推送：[docs/UNIFIED_PUSH.md](docs/UNIFIED_PUSH.md)

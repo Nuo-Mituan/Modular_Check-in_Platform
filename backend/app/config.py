@@ -205,6 +205,19 @@ class Settings(BaseSettings):
         self.push_after_flush_mode = mode
 
     @property
+    def sqlite_file_path(self) -> Path | None:
+        """Actual SQLite file path derived from DATABASE_URL (None if not SQLite)."""
+        url = self.sqlalchemy_url
+        if not url.startswith("sqlite"):
+            return None
+        from sqlalchemy.engine import make_url
+
+        database = make_url(url).database
+        if not database or database == ":memory:":
+            return None
+        return Path(database).expanduser().resolve()
+
+    @property
     def sqlalchemy_url(self) -> str:
         if self.database_url:
             return self.database_url

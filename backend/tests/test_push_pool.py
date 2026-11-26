@@ -994,3 +994,249 @@ async def test_zero_timeout_never_triggers_before_scheduled_at(monkeypatch) -> N
     assert trigger == datetime(
         2026, 11, 8, 23, 45, tzinfo=settings.timezone_info
     ).astimezone(timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_timeout_failure_on_failed_batch_is_idempotent() -> None:
+    from app.models import PushBatch
+    from app.services.push_delivery import FLUSH_TIMEOUT, SendOutcome, _finalize_flush
+
+    await init_db()
+    async with SessionLocal() as db:
+        batch = PushBatch(
+            cycle_id="2026-12-20",
+            idempotency_key="unified:2026-12-20",
+            status="failed",
+            expected_count=1,
+        )
+        db.add(batch)
+        await db.commit()
+        await db.refresh(batch)
+        await _finalize_flush(
+            db,
+            batch,
+            {"success": 0, "failed": 1, "skipped": 0, "pending": 0, "timeout": 0},
+            "汇总失败",
+            {"channel": "none"},
+            SendOutcome(sent=False, error="network"),
+            mode=FLUSH_TIMEOUT,
+        )
+        assert batch.status == "failed"
+        assert batch.timeout_attempted_at is not None
+
+
+@pytest.mark.asyncio
+async def test_flush_releases_cycle_lock_during_http(monkeypatch) -> None:
+    from datetime import timezone
+    from app.services import push_delivery
+    from app.services.push_delivery import SendOutcome
+    from app.services.push_lock import get_cycle_lock
+
+    await init_db()
+    await _disable_pool_modules()
+    cycle = "2026-12-21"
+    module = _module(cycle="daily")
+    await _add_modules(module)
+    await push_pool.ensure_batch(cycle)
+    async with SessionLocal() as db:
+        batch = await db.scalar(select(PushBatch).where(PushBatch.cycle_id == cycle))
+        assert batch is not None
+        batch.trigger_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        await db.commit()
+    observed = {"locked": None}
+
+    async def fake_send(db, batch, summary, *, config, timeout=False):
+        observed["locked"] = get_cycle_lock(batch.cycle_id).locked()
+        return config, SendOutcome(sent=True)
+
+    monkeypatch.setattr(push_delivery, "_send_summary", fake_send)
+    assert await push_delivery.flush_batch(cycle) is True
+    assert observed["locked"] is False
+
+
+@pytest.mark.asyncio
+async def test_stale_delivery_claim_is_reclaimed(monkeypatch) -> None:
+    from datetime import timezone
+    from app.services import push_delivery
+    from app.services.push_delivery import SendOutcome
+
+    await init_db()
+    await _disable_pool_modules()
+    cycle = "2026-12-22"
+    module = _module(cycle="daily")
+    await _add_modules(module)
+    await push_pool.ensure_batch(cycle)
+    async with SessionLocal() as db:
+        batch = await db.scalar(select(PushBatch).where(PushBatch.cycle_id == cycle))
+        assert batch is not None
+        batch.trigger_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        batch.delivery_started_at = datetime.now(timezone.utc) - timedelta(hours=2)
+        batch.delivery_claim_token = "stale"
+        await db.commit()
+    sent = {"value": False}
+
+    async def fake_send(db, batch, summary, *, config, timeout=False):
+        sent["value"] = True
+        return config, SendOutcome(sent=True)
+
+    monkeypatch.setattr(push_delivery, "_send_summary", fake_send)
+    assert await push_delivery.flush_batch(cycle) is True
+    assert sent["value"] is True
+
+
+@pytest.mark.asyncio
+async def test_cleanup_dead_outbox(monkeypatch) -> None:
+    from app.models import PushOutbox
+    from app.services import push_outbox
+
+    await init_db()
+    async with SessionLocal() as db:
+        db.add(PushOutbox(
+            idempotency_key="dead-cleanup-test",
+            kind="audit",
+            message="dead",
+            status="dead",
+            attempts=10,
+            created_at=datetime.now(timezone.utc) - timedelta(days=30),
+        ))
+        await db.commit()
+    monkeypatch.setattr(
+        push_outbox.asyncio, "to_thread", lambda fn, *a, **kw: asyncio.sleep(0, result=1)
+    )
+    deleted = await push_outbox.cleanup_dead_outbox()
+    assert deleted >= 1
+
+
+@pytest.mark.asyncio
+async def test_late_result_during_send_is_supplemented(monkeypatch) -> None:
+    from datetime import timezone
+    from app.models import PushPool
+    from app.services import push_delivery
+    from app.services.push_delivery import SendOutcome
+
+    await init_db()
+    await _disable_pool_modules()
+    cycle = "2026-12-23"
+    module = _module(cycle="daily")
+    module_id = (await _add_modules(module))[0]
+    await push_pool.ensure_batch(cycle)
+    async with SessionLocal() as db:
+        batch = await db.scalar(select(PushBatch).where(PushBatch.cycle_id == cycle))
+        assert batch is not None
+        batch.trigger_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        await db.commit()
+    supplements: list[tuple] = []
+
+    async def fake_send(db, batch, summary, *, config, timeout=False):
+        async with SessionLocal() as late_db:
+            row = await late_db.scalar(
+                select(PushPool).where(
+                    PushPool.cycle_id == cycle, PushPool.module_id == module_id
+                )
+            )
+            assert row is not None
+            row.status = "success"
+            row.message = "late"
+            await late_db.commit()
+        return config, SendOutcome(sent=True)
+
+    async def fake_supplement(*args):
+        supplements.append(args)
+        return True
+
+    monkeypatch.setattr(push_delivery, "_send_summary", fake_send)
+    monkeypatch.setattr(push_delivery, "_supplement_after_flush", fake_supplement)
+    assert await push_delivery.flush_batch(cycle) is True
+    assert supplements
+
+
+@pytest.mark.asyncio
+async def test_late_supplement_failure_keeps_row(monkeypatch) -> None:
+    from datetime import timezone
+    from app.models import PushPool
+    from app.services import push_delivery
+    from app.services.push_delivery import SendOutcome
+
+    await init_db()
+    await _disable_pool_modules()
+    cycle = "2026-12-24"
+    module = _module(cycle="daily")
+    module_id = (await _add_modules(module))[0]
+    await push_pool.ensure_batch(cycle)
+    async with SessionLocal() as db:
+        batch = await db.scalar(select(PushBatch).where(PushBatch.cycle_id == cycle))
+        assert batch is not None
+        batch.trigger_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        await db.commit()
+
+    async def fake_send(db, batch, summary, *, config, timeout=False):
+        async with SessionLocal() as late_db:
+            row = await late_db.scalar(
+                select(PushPool).where(
+                    PushPool.cycle_id == cycle, PushPool.module_id == module_id
+                )
+            )
+            assert row is not None
+            row.status = "success"
+            row.message = "late"
+            await late_db.commit()
+        return config, SendOutcome(sent=True)
+
+    async def failed_supplement(*_args):
+        return False
+
+    monkeypatch.setattr(push_delivery, "_send_summary", fake_send)
+    monkeypatch.setattr(push_delivery, "_supplement_after_flush", failed_supplement)
+    assert await push_delivery.flush_batch(cycle) is True
+    async with SessionLocal() as db:
+        assert await db.scalar(
+            select(PushPool).where(
+                PushPool.cycle_id == cycle, PushPool.module_id == module_id
+            )
+        ) is not None
+
+
+@pytest.mark.asyncio
+async def test_none_mode_keeps_late_row(monkeypatch) -> None:
+    from datetime import timezone
+    from app.config import settings
+    from app.services import push_delivery
+    from app.services.push_delivery import SendOutcome
+
+    await init_db()
+    await _disable_pool_modules()
+    cycle = "2026-12-25"
+    module = _module(cycle="daily")
+    module_id = (await _add_modules(module))[0]
+    await push_pool.ensure_batch(cycle)
+    async with SessionLocal() as db:
+        batch = await db.scalar(select(PushBatch).where(PushBatch.cycle_id == cycle))
+        assert batch is not None
+        batch.trigger_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        await db.commit()
+    old_mode = settings.push_after_flush_mode
+    settings.push_after_flush_mode = "none"
+    try:
+        async def fake_send(db, batch, summary, *, config, timeout=False):
+            async with SessionLocal() as late_db:
+                row = await late_db.scalar(
+                    select(PushPool).where(
+                        PushPool.cycle_id == cycle, PushPool.module_id == module_id
+                    )
+                )
+                assert row is not None
+                row.status = "success"
+                row.message = "late"
+                await late_db.commit()
+            return config, SendOutcome(sent=True)
+
+        monkeypatch.setattr(push_delivery, "_send_summary", fake_send)
+        assert await push_delivery.flush_batch(cycle) is True
+        async with SessionLocal() as db:
+            assert await db.scalar(
+                select(PushPool).where(
+                    PushPool.cycle_id == cycle, PushPool.module_id == module_id
+                )
+            ) is not None
+    finally:
+        settings.push_after_flush_mode = old_mode

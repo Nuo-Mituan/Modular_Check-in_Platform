@@ -16,7 +16,7 @@
 > **Batch 3 状态（2026-10-20）**：TD-06 / TD-13 / TD-14 / TD-16 / TD-20 已完成。
 > 环形日志改为单写线程 + 有界队列；SSE 指标/重连滞后可查询；心跳可配置；新增只读系统日志页。
 
-### 已完成（33）
+### 已完成（34）
 
 | 状态 | ID | 优先级 | 位置 | 问题 | 影响 | 建议 | 责任人 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -53,6 +53,7 @@
 | ✅ | TD-34 | P3 | `frontend/package-lock.json` / CI | npm audit 剩余 3 个 moderate（glob/js-beautify/editorconfig）；CI 未设 audit gate | 未来若把 audit 设为闸门会突然变红 | 先登记 known moderate；优先升级上游，必要时 overrides 并留 provenance | 前端维护者 |
 | ✅ | TD-35 | P3 | `backend/app/services/chrome_sync.py` / `module_params.py` | Chrome 同步参数写入已复用统一校验器 | 保存路径分叉风险已收敛 | 已抽出 `validate_module_params`，Chrome 同步写入前执行同一校验 | 平台维护者 |
 | ✅ | TD-36 | P3 | `services/module_params.py` | 实时 config.json 校验已同步刷新 DB param_schema | schema drift 窗口已收敛 | 实时读取作为权威源，差异时更新模块 schema | 平台维护者 |
+| ✅ | TD-37 | P3 | `migrations.py` / `push_delivery.py` / `routers/modules.py` | 核心长函数已完成拆分 | 结构维护性提升 | 迁移、flush 准备/记录、图标路径与限流已抽为独立函数 | 平台维护者 |
 
 ### 待清零（0）
 
@@ -71,7 +72,7 @@
 
 ### v1.0.7 技术债核对结论（2026-11-01）
 
-- 已完成：**33 项**；待清零：**0 项**；已关闭：**3 项**（总数 36）。
+- 已完成：**34 项**；待清零：**0 项**；已关闭：**3 项**（总数 37）。
 - 差异说明：`TECH_DEBT_CLEARANCE_PLAN.md` 记录 RC6-TD-01~20 已全部清零，但本次核对确认
   TD-18（CI 缺 import-linter）与 TD-19（`backend/app/models.py` 仍保留废弃的
   `execution_logs.output` 字段）不标为已完成。
@@ -118,6 +119,13 @@
   必须为模块参数/schema 更新增加行锁或乐观锁版本字段，避免 lost update。
 - `config_from_module` 每次 Chrome 同步读取并解析 `config.json`；若未来模块规模导致 P99 延迟明显，
   再引入基于 mtime 的短缓存，不提前增加复杂度。
+
+## TD-37 完成记录
+
+- 2026-11-26：迁移函数、统一推送准备/记录、模块图标路径与限流完成拆分，全部函数低于 80 行。
+
+
+- 2026-11-26：登记批次 C 长函数拆分残留，涉及迁移、统一推送 flush 与模块图标路由。
 
 ## TD-35 完成记录
 
@@ -279,7 +287,7 @@ v1.0.7 第一周必须完成以下评估并给出排期：
 ## 自检数据
 
 ```text
-已完成标记数：33
+已完成标记数：34
 待清零标记数：0
 修改文件：docs/TECH_DEBT.md
 未修改：任何源码、测试、Releases/v1.0.6/

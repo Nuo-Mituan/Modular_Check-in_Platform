@@ -668,3 +668,27 @@ async def test_disable_sync_first_request_reads_realtime_config(monkeypatch) -> 
         monkeypatch.setattr(chrome_sync, "load_module_config", live_config)
         data = await chrome_sync.set_module_sync(db, module, False)
         assert data["supported"] is True
+
+
+@pytest.mark.asyncio
+async def test_seed_admin_does_not_reset_strong_password_flag(monkeypatch) -> None:
+    from sqlalchemy import select
+    from app.database import SessionLocal, init_db
+    from app.models import User
+    from app.security import hash_password
+    from app.services.bootstrap import seed_admin
+    from app.config import settings
+
+    await init_db()
+    await seed_admin()
+    async with SessionLocal() as db:
+        admin = await db.scalar(select(User).where(User.username == (settings.admin_user or "admin")))
+        assert admin is not None
+        admin.password_hash = hash_password("strong-password-not-default")
+        admin.password_must_change = False
+        await db.commit()
+    await seed_admin()
+    async with SessionLocal() as db:
+        admin = await db.scalar(select(User).where(User.username == (settings.admin_user or "admin")))
+        assert admin is not None
+        assert admin.password_must_change is False

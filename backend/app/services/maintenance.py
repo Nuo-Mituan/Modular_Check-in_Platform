@@ -138,6 +138,9 @@ async def _purge_push_tables(cutoff: datetime) -> None:
         await db.execute(delete(PushRecord).where(PushRecord.created_at < cutoff))
         await db.execute(delete(PushBatch).where(PushBatch.created_at < cutoff))
         await db.commit()
+    from .push_outbox import cleanup_dead_outbox
+
+    await cleanup_dead_outbox()
 
 
 async def purge_old_logs(days: int | None = None) -> tuple[int, int]:
@@ -157,7 +160,7 @@ async def purge_old_logs(days: int | None = None) -> tuple[int, int]:
     ring_removed = await asyncio.to_thread(ring_log.trim_retention, retention)
     rows_removed = await _purge_legacy_execution_rows(cutoff)
     await _purge_push_tables(cutoff)
-    files_removed = _prune_log_files(cutoff)
+    files_removed = await asyncio.to_thread(_prune_log_files, cutoff)
     if ring_removed or rows_removed or files_removed:
         logger.info(
             "清理过期日志：环形日志 %s 条，历史记录 %s 条，旧文件 %s 个（保留 %s 天）",

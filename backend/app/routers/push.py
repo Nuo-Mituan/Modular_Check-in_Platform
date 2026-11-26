@@ -133,7 +133,9 @@ async def reveal_push_config(
         stored_user = await db.get(User, user_id)
         if stored_user is None:
             raise HTTPException(status_code=404, detail="用户不存在")
-        if not verify_password(payload.current_password, stored_user.password_hash):
+        if not await asyncio.to_thread(
+            verify_password, payload.current_password, stored_user.password_hash
+        ):
             sensitive_limiter.record_failure(user_id)
             raise HTTPException(status_code=400, detail="当前密码不正确")
         sensitive_limiter.reset(user_id)
