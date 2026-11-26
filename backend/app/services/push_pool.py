@@ -22,6 +22,7 @@ from .push_plan import (
 )
 from ..database import SessionLocal
 from .push import load_unified_settings
+from .push_outbox import enqueue as enqueue_outbox, make_idempotency_key
 from .push_lock import get_cycle_lock as _lock
 from .push_state import (
     BATCH_EXPIRED,
@@ -109,7 +110,7 @@ async def record_unified_result(
             logger.warning("拒绝过期批次迟到结果 cycle=%s module=%s", cycle_id, module_id)
             return
         if decision.supplement is not None:
-            await _supplement_after_flush(
+            handled = await _supplement_after_flush(
                 decision.supplement.module_id,
                 decision.supplement.module_key,
                 decision.supplement.module_name,
@@ -118,6 +119,29 @@ async def record_unified_result(
                 status,
                 message,
             )
+            if not handled:
+                logger.warning(
+                    "迟到结果未补发 cycle=%s module=%s reason=supplement_not_handled",
+                    cycle_id,
+                    decision.supplement.module_id,
+                )
+                async with SessionLocal() as outbox_db:
+                    enqueue_outbox(
+                        outbox_db,
+                        idempotency_key=make_idempotency_key(
+                            "supplement_unhandled",
+                            cycle_id,
+                            decision.supplement.module_id,
+                            status,
+                            message,
+                        ),
+                        kind="supplement_unhandled",
+                        message=(
+                            f"迟到结果未处理 cycle={cycle_id} "
+                            f"module={decision.supplement.module_key} status={status}"
+                        ),
+                    )
+                    await outbox_db.commit()
 
 
 __all__ = [

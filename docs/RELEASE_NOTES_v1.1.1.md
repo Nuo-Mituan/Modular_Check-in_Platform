@@ -23,7 +23,7 @@
 
 ## 验证
 
-- 后端：326 passed / 0 failed
+- 后端：327 passed / 0 failed
 - 前端：44 passed
 - mypy：0 errors
 - OpenAPI：paths=43 / breaking=0
@@ -58,3 +58,7 @@
 
 - push_after_flush_mode=none 时不再把迟到结果标记为已处理；保留池明细并记录 warning，避免静默丢弃。
 - cleanup_outbox 脚本增加数据库初始化、sys.path 判重，并输出剩余 dead 行数量。
+
+## 第七轮审查修复
+
+- 终态批次后的迟到结果若未被补发，写入 supplement_unhandled outbox 审计并记录 warning，不再静默丢弃。

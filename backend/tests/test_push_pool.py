@@ -1240,3 +1240,39 @@ async def test_none_mode_keeps_late_row(monkeypatch) -> None:
             ) is not None
     finally:
         settings.push_after_flush_mode = old_mode
+
+
+@pytest.mark.asyncio
+async def test_terminal_late_result_none_mode_writes_audit() -> None:
+    from app.config import settings
+    from app.models import PushOutbox
+
+    await init_db()
+    await _disable_pool_modules()
+    cycle = "2026-12-26"
+    module = _module(cycle="daily")
+    module_id = (await _add_modules(module))[0]
+    await push_pool.ensure_batch(cycle)
+    async with SessionLocal() as db:
+        batch = await db.scalar(select(PushBatch).where(PushBatch.cycle_id == cycle))
+        assert batch is not None
+        batch.status = "sent"
+        await db.commit()
+    old_mode = settings.push_after_flush_mode
+    settings.push_after_flush_mode = "none"
+    try:
+        await push_pool.record_unified_result(
+            module_id,
+            status="success",
+            message="late",
+            details="late",
+            trigger="schedule",
+            cycle_id=cycle,
+        )
+    finally:
+        settings.push_after_flush_mode = old_mode
+    async with SessionLocal() as db:
+        row = await db.scalar(
+            select(PushOutbox).where(PushOutbox.kind == "supplement_unhandled")
+        )
+        assert row is not None
