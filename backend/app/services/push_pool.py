@@ -109,7 +109,7 @@ async def record_unified_result(
         if decision.reject_reason == "expired":
             logger.warning("拒绝过期批次迟到结果 cycle=%s module=%s", cycle_id, module_id)
             return
-        if decision.supplement is not None:
+        if decision.supplement is not None and trigger == "schedule":
             handled = await _supplement_after_flush(
                 decision.supplement.module_id,
                 decision.supplement.module_key,

@@ -1276,3 +1276,36 @@ async def test_terminal_late_result_none_mode_writes_audit() -> None:
             select(PushOutbox).where(PushOutbox.kind == "supplement_unhandled")
         )
         assert row is not None
+
+
+@pytest.mark.asyncio
+async def test_manual_terminal_late_result_has_no_supplement_audit() -> None:
+    from app.models import PushOutbox
+
+    await init_db()
+    await _disable_pool_modules()
+    cycle = "2026-12-27"
+    module = _module(cycle="daily")
+    module_id = (await _add_modules(module))[0]
+    await push_pool.ensure_batch(cycle)
+    async with SessionLocal() as db:
+        batch = await db.scalar(select(PushBatch).where(PushBatch.cycle_id == cycle))
+        assert batch is not None
+        batch.status = "sent"
+        await db.commit()
+    await push_pool.record_unified_result(
+        module_id,
+        status="success",
+        message="manual late",
+        details="manual",
+        trigger="manual",
+        cycle_id=cycle,
+    )
+    async with SessionLocal() as db:
+        count = await db.scalar(
+            select(func.count()).select_from(PushOutbox).where(
+                PushOutbox.kind == "supplement_unhandled",
+                PushOutbox.message.contains(cycle),
+            )
+        )
+        assert count == 0

@@ -23,7 +23,7 @@
 
 ## 验证
 
-- 后端：327 passed / 0 failed
+- 后端：328 passed / 0 failed
 - 前端：44 passed
 - mypy：0 errors
 - OpenAPI：paths=43 / breaking=0
@@ -62,3 +62,8 @@
 ## 第七轮审查修复
 
 - 终态批次后的迟到结果若未被补发，写入 supplement_unhandled outbox 审计并记录 warning，不再静默丢弃。
+
+## 第八轮审查修复
+
+- cleanup_outbox 脚本改为单一事件循环并 dispose 引擎，避免跨 loop 复用异步引擎。
+- 手动触发的终态迟到结果不再写入 supplement_unhandled 审计；仅 schedule 触发记录。
