@@ -8,6 +8,12 @@
 - 开发依赖升级为 pytest 9.2.0 + pytest-asyncio 1.5.0，修复安装冲突。
 - Pillow/redis/hypothesis 下限提升到具备 cp313 wheel 的版本。
 
+### Frontend
+
+- Vue 3.5.46、Element Plus 2.14.9、Pinia 4.1.0、Vue Router 5.5.3。
+- Vite 8.4.0、@vitejs/plugin-vue 6.0.11、Vitest 5.1.2、jsdom 31.0.1。
+- 适配 Vite 8/Rolldown 的 manualChunks 配置，Node 要求 >=22.22.2。
+
 ### Fixed
 
 - 修复 ruff F/E9 与 Python 3.13 目标下的 mypy 类型问题。

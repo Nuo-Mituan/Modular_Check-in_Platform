@@ -40,9 +40,16 @@ export default defineConfig(({ mode }) => {
       sourcemap: false,
       rollupOptions: {
         output: {
-          manualChunks: {
-            vue: ['vue', 'vue-router', 'pinia'],
-            'element-plus': ['element-plus', '@element-plus/icons-vue'],
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (id.includes('element-plus') || id.includes('@element-plus')) return 'element-plus'
+            if (
+              id.includes('/vue/') ||
+              id.includes('/vue-router/') ||
+              id.includes('/pinia/') ||
+              id.includes('@vue/')
+            ) return 'vue'
+            return undefined
           },
         },
       },

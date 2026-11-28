@@ -11,3 +11,10 @@
 - 清理 ruff F/E9 问题，后端在 Python 3.13 下 329 项测试通过。
 
 - 修复 import-linter CI 的无效 `pip install -e .` 步骤；import-linter 在 Python 3.13 下 3 项契约全部通过。
+
+## 前端依赖升级
+
+- Vue 3.5.46、Element Plus 2.14.9、Pinia 4.1.0、Vue Router 5.5.3。
+- Vite 8.4.0、@vitejs/plugin-vue 6.0.11、Vitest 5.1.2、jsdom 31.0.1。
+- 适配 Vite 8/Rolldown 的 manualChunks 函数式配置；Node 引擎要求提升到 >=22.22.2。
+- npm audit 0，前端单测 37 + 组件 7 全部通过。

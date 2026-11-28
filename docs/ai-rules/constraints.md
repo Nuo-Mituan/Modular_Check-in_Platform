@@ -19,8 +19,8 @@
 | redis | ≥5.0.0 | 可选预留 |
 
 ### 前端
-Vue 3.5.44（^3.5.13） │ Element Plus 2.14.7（^2.9.1） │ Pinia 2.3.1（^2.3.0）
-Vue Router 4.6.4（^4.5.0） │ Axios 1.20.0（^1.7.9） │ dayjs 1.11.23（^1.11.13） │ Vite 6.4.4（^6.0.7）
+Vue 3.5.46（^3.5.46） │ Element Plus 2.14.9（^2.14.9） │ Pinia 4.1.0（^4.1.0）
+Vue Router 5.5.3（^5.5.3） │ Axios 1.21.1（^1.21.1） │ dayjs 1.11.23（^1.11.23） │ Vite 8.4.0（^8.4.0）
 
 > 锁定版本取自 `frontend/pnpm-lock.yaml` / `package-lock.json`；括号内为 `package.json` 声明范围。
 
