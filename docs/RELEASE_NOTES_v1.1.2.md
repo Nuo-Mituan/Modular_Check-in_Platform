@@ -19,3 +19,12 @@
 - 适配 Vite 8/Rolldown 的 manualChunks 函数式配置；Node 引擎要求提升到 >=22.22.2。
 - Element Plus 改为按需组件解析并移除全量图标注册；Element Plus vendor JS 从约 1.14 MB（gzip 358 KB）降至约 547 KB（gzip 186 KB）。
 - npm audit 0，前端单测 37 + 组件 7 全部通过。
+
+## 后端依赖升级
+
+- FastAPI 0.165.0、Uvicorn 0.55.0、SQLAlchemy 2.1.9、aiosqlite 0.22.1。
+- APScheduler 3.11.3、cryptography 50.0.2、pydantic-settings 2.16.3。
+- python-multipart 0.0.34、httpx 0.29.0、tzdata 2026.6。
+- Pillow 13.0.0、redis 8.2.0、hypothesis 6.170.23。
+- 开发工具升级到 ruff 0.17.6、mypy 2.4.1。
+- SQLAlchemy 2.1 默认异步 SQLite 连接池会变为 QueuePool；显式保持 SQLite NullPool，并对 pool 指标做非负钳制。

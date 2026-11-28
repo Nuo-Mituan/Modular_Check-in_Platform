@@ -6,17 +6,17 @@
 | 组件 | 版本 | 用途 |
 |---|---|---|
 | Python | 3.13 | 运行时 |
-| FastAPI | 0.115.6 | Web 框架（异步） |
-| SQLAlchemy | 2.0.36 | ORM（asyncio） |
-| aiosqlite | 0.20.0 | SQLite 异步驱动 |
-| APScheduler | 3.10.4 | 定时调度 |
-| cryptography | 50.0.0 | AES-256-GCM (v2) |
-| pydantic-settings | 2.7.1 | 环境变量配置 |
-| python-multipart | 0.0.32 | 文件上传 |
-| httpx | 0.28.1 | 异步 HTTP（推送） |
+| FastAPI | 0.165.0 | Web 框架（异步） |
+| SQLAlchemy | 2.1.9 | ORM（asyncio） |
+| aiosqlite | 0.22.1 | SQLite 异步驱动 |
+| APScheduler | 3.11.3 | 定时调度 |
+| cryptography | 50.0.2 | AES-256-GCM (v2) |
+| pydantic-settings | 2.16.3 | 环境变量配置 |
+| python-multipart | 0.0.34 | 文件上传 |
+| httpx | 0.29.0 | 异步 HTTP（推送） |
 | itsdangerous | 2.2.0 | 会话签名 |
-| Pillow | ≥11.0.0 | 图标处理 |
-| redis | ≥5.0.0 | 可选预留 |
+| Pillow | 13.0.0 | 图标处理 |
+| redis | 8.2.0 | 可选预留 |
 
 ### 前端
 Vue 3.5.46（^3.5.46） │ Element Plus 2.14.9（^2.14.9） │ Pinia 4.1.0（^4.1.0）

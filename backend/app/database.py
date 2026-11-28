@@ -7,6 +7,7 @@ import sqlite3
 from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from .config import settings
 from .models import Base
@@ -17,11 +18,19 @@ _connect_args: dict[str, object] = {}
 if settings.sqlalchemy_url.startswith("sqlite"):
     _connect_args = {"timeout": 30}
 
+_pool_kwargs: dict[str, object] = {}
+if settings.sqlalchemy_url.startswith("sqlite"):
+    # SQLAlchemy 2.1 changed the async SQLite default from NullPool to
+    # AsyncAdaptedQueuePool. Keep one connection per checkout for SQLite so
+    # WAL writes do not inherit a persistent multi-connection pool.
+    _pool_kwargs["poolclass"] = NullPool
+
 engine = create_async_engine(
     settings.sqlalchemy_url,
     echo=False,
     pool_pre_ping=True,
     connect_args=_connect_args,
+    **_pool_kwargs,
 )
 
 SessionLocal = async_sessionmaker(

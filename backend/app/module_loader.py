@@ -1063,10 +1063,10 @@ def _get_pool_metrics() -> dict[str, int]:
         from .database import engine
         pool = engine.pool
         metrics = {
-            "pool_size": int(getattr(pool, "size", lambda: 0)()),
-            "pool_checked_in": int(getattr(pool, "checkedin", lambda: 0)()),
-            "pool_checked_out": int(getattr(pool, "checkedout", lambda: 0)()),
-            "pool_overflow": int(getattr(pool, "overflow", lambda: 0)()),
+            "pool_size": max(0, int(getattr(pool, "size", lambda: 0)())),
+            "pool_checked_in": max(0, int(getattr(pool, "checkedin", lambda: 0)())),
+            "pool_checked_out": max(0, int(getattr(pool, "checkedout", lambda: 0)())),
+            "pool_overflow": max(0, int(getattr(pool, "overflow", lambda: 0)())),
         }
         _POOL_METRICS_CACHE = metrics
         _POOL_METRICS_TS = now

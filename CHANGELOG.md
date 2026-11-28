@@ -8,6 +8,14 @@
 - 开发依赖升级为 pytest 9.2.0 + pytest-asyncio 1.5.0，修复安装冲突。
 - Pillow/redis/hypothesis 下限提升到具备 cp313 wheel 的版本。
 
+### Backend
+
+- FastAPI 0.165.0、Uvicorn 0.55.0、SQLAlchemy 2.1.9、aiosqlite 0.22.1。
+- APScheduler 3.11.3、cryptography 50.0.2、pydantic-settings 2.16.3。
+- httpx 0.29.0、python-multipart 0.0.34、Pillow 13.0.0、redis 8.2.0。
+- ruff 0.17.6、mypy 2.4.1。
+- 显式保持 SQLite NullPool，避免 SQLAlchemy 2.1 默认 QueuePool 改变连接语义。
+
 ### Frontend
 
 - Vue 3.5.46、Element Plus 2.14.9、Pinia 4.1.0、Vue Router 5.5.3。
