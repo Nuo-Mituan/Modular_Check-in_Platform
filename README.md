@@ -700,7 +700,7 @@ async def run(params: dict[str, Any]) -> dict[str, Any]:
 
 ## 本地开发
 
-### 后端（Python 3.11+）
+### 后端（Python 3.13+）
 
 ```bash
 python3 -m venv .venv
@@ -1050,7 +1050,7 @@ Cookie 会话登录；写请求还需携带 `X-CSRF-Token`。不再使用 JWT/Be
 
 ## 技术栈
 
-- **后端**：Python 3.11、FastAPI、SQLAlchemy 2（async）、SQLite、APScheduler 3、itsdangerous、cryptography、Pillow、pathlib
+- **后端**：Python 3.13、FastAPI、SQLAlchemy 2（async）、SQLite、APScheduler 3、itsdangerous、cryptography、Pillow、pathlib
 - **前端**：Vue 3、Vite 6、Element Plus、Pinia、Vue Router、Axios、Day.js
 - **部署**：多阶段 Dockerfile、Docker Compose、持久化 volumes、容器健康检查
 

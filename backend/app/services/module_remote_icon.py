@@ -24,7 +24,7 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 
 from ..config import settings
-from .icon_policy import detect_icon_format, is_svg, ICON_UNSUPPORTED_DETAIL, ICON_ALLOWED, FORMAT_TO_CONTENT_TYPE
+from .icon_policy import detect_icon_format, is_svg, ICON_ALLOWED, FORMAT_TO_CONTENT_TYPE
 from .remote_url import (
     REMOTE_HTTP_ERROR,
     RemoteUrlError,

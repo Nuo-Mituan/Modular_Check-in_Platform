@@ -92,7 +92,10 @@ async def get_latest_release() -> LatestRelease | None:
 def newer_version(latest: str, current: str) -> bool:
     def parse(value: str) -> tuple[int, int, int] | None:
         match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)", str(value).strip())
-        return tuple(int(part) for part in match.groups()) if match else None
+        if match is None:
+            return None
+        major, minor, patch = match.groups()
+        return int(major), int(minor), int(patch)
 
     left, right = parse(latest), parse(current)
     return left is not None and right is not None and left > right

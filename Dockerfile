@@ -16,7 +16,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # 2. Runtime image: FastAPI + APScheduler + SQLite
 # ---------------------------------------------------------------------------
-FROM python:3.11-slim AS runtime
+FROM python:3.13-slim AS runtime
 
 ARG APP_UID=10001
 ARG APP_GID=10001

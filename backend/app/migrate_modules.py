@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import sys
 from dataclasses import dataclass, field
 
 from sqlalchemy import select

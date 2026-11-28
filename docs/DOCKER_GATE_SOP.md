@@ -113,7 +113,7 @@ bash verify_docker.sh
 
 ## 7. 网络与 SSE 重连压测
 
-在宿主机 Python 3.11+ 环境执行（推荐独立 venv）：
+在宿主机 Python 3.13+ 环境执行（推荐独立 venv）：
 
 ```bash
 python3 -m venv .venv-gate

@@ -17,12 +17,10 @@ import uuid
 from collections import OrderedDict
 from threading import Event, Lock
 from weakref import WeakSet
-from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
-from PIL import Image, UnidentifiedImageError
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import delete, select

@@ -142,7 +142,7 @@ def plan_module_update(
 ) -> ModuleUpdatePlan:
     start, end, cycle, sub, changed = _next_schedule(module, payload, hooks)
     target_enabled = module.enabled if payload.enabled is None else payload.enabled
-    fields_set = getattr(payload, "model_fields_set", set())
+    fields_set: set[str] = getattr(payload, "model_fields_set", set())
     if "execution_timeout_seconds" in fields_set:
         execution_timeout = payload.execution_timeout_seconds
     else:

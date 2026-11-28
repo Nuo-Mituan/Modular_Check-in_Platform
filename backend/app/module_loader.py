@@ -9,7 +9,6 @@ A module is a directory inside MODULES_DIR containing:
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import importlib.util
 import os
 import json
@@ -459,10 +458,10 @@ def _apply_field_values(module: Module, values: dict[str, Any]) -> None:
     Other None values intentionally clear the DB field (config is source of
     truth). This preserves manually mapped directory/legacy credentials.
     """
-    for field, value in values.items():
-        if value is None and field in _SKIP_NONE_FIELDS:
+    for field_name, value in values.items():
+        if value is None and field_name in _SKIP_NONE_FIELDS:
             continue
-        setattr(module, field, value)
+        setattr(module, field_name, value)
 
 
 def _create_module_from_config(
@@ -1199,7 +1198,6 @@ async def sync_modules(db: AsyncSession) -> SyncResult:
 
 async def _sync_modules_locked(db: AsyncSession) -> SyncResult:
     scanned = await asyncio.to_thread(scan_modules)
-    scanned_keys = {item.key for item in scanned}
     result = SyncResult()
     seen: set[str] = set()
     for item in scanned:

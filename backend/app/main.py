@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import socket
 import re
 import time
@@ -183,7 +182,6 @@ def get_db_log_suppression_stats() -> dict[str, int]:
     _cleanup_expired_db_log_types(now)
 
     with _db_log_lock:
-        suppressed_snapshot = dict(_db_log_suppressed_count)
         active_types_count = len(_db_log_last_emit)
         overflow_count = _db_log_overflow_count
         suppressed_total = _db_log_suppressed_total

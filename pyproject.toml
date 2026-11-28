@@ -1,10 +1,13 @@
 [project]
 name = "modular-checkin-platform"
 version = "1.1.1"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
+classifiers = [
+  "Programming Language :: Python :: 3.13",
+]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py313"
 line-length = 100
 
 [tool.ruff.lint]
@@ -12,7 +15,7 @@ select = ["F", "E9"]
 ignore = []
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 ignore_missing_imports = true
 follow_imports = "skip"
 files = [

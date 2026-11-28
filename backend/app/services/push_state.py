@@ -18,6 +18,7 @@ from .push_lock import get_cycle_lock as _lock
 from .redaction import redact_text
 from .push_outbox import enqueue as enqueue_outbox, make_idempotency_key
 from .push_time import cycle_id_for, module_due
+from ..timeutils import utcnow
 from ..models import (
     Module,
     PushBatch,
