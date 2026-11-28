@@ -692,3 +692,23 @@ async def test_seed_admin_does_not_reset_strong_password_flag(monkeypatch) -> No
         admin = await db.scalar(select(User).where(User.username == (settings.admin_user or "admin")))
         assert admin is not None
         assert admin.password_must_change is False
+
+
+@pytest.mark.asyncio
+async def test_push_batches_migration_adds_delivery_claim_token(tmp_path) -> None:
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from app.migrations import _migrate_push_columns
+
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'old.db'}")
+    try:
+        async with engine.begin() as conn:
+            await conn.exec_driver_sql("CREATE TABLE push_config (id INTEGER PRIMARY KEY)")
+            await conn.exec_driver_sql("CREATE TABLE push_batches (id INTEGER PRIMARY KEY, status VARCHAR(16))")
+        async with engine.begin() as conn:
+            await _migrate_push_columns(conn)
+        async with engine.connect() as conn:
+            columns = {row[1] for row in (await conn.exec_driver_sql("PRAGMA table_info(push_batches)")).fetchall()}
+        assert "delivery_claim_token" in columns
+        assert "delivery_started_at" in columns
+    finally:
+        await engine.dispose()

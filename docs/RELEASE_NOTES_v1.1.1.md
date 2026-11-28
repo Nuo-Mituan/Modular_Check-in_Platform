@@ -23,7 +23,7 @@
 
 ## 验证
 
-- 后端：328 passed / 0 failed
+- 后端：329 passed / 0 failed
 - 前端：44 passed
 - mypy：0 errors
 - OpenAPI：paths=43 / breaking=0
@@ -67,3 +67,7 @@
 
 - cleanup_outbox 脚本改为单一事件循环并 dispose 引擎，避免跨 loop 复用异步引擎。
 - 手动触发的终态迟到结果不再写入 supplement_unhandled 审计；仅 schedule 触发记录。
+
+## 第九轮审查修复
+
+- 修复 push_batches 旧库迁移遗漏 delivery_claim_token 列的问题；启动迁移会自动补列，避免推送中心与 sweep 查询报 no such column。

@@ -263,6 +263,7 @@ async def _migrate_push_columns(connection) -> None:
         ("timeout_at", "DATETIME"),
         ("timeout_attempted_at", "DATETIME"),
         ("delivery_started_at", "DATETIME"),
+        ("delivery_claim_token", "VARCHAR(64)"),
     ):
         if batch_columns and name not in batch_columns:
             await connection.exec_driver_sql(
