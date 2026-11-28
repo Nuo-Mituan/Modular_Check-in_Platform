@@ -17,4 +17,5 @@
 - Vue 3.5.46、Element Plus 2.14.9、Pinia 4.1.0、Vue Router 5.5.3。
 - Vite 8.4.0、@vitejs/plugin-vue 6.0.11、Vitest 5.1.2、jsdom 31.0.1。
 - 适配 Vite 8/Rolldown 的 manualChunks 函数式配置；Node 引擎要求提升到 >=22.22.2。
+- Element Plus 改为按需组件解析并移除全量图标注册；Element Plus vendor JS 从约 1.14 MB（gzip 358 KB）降至约 547 KB（gzip 186 KB）。
 - npm audit 0，前端单测 37 + 组件 7 全部通过。

@@ -13,6 +13,7 @@
 - Vue 3.5.46、Element Plus 2.14.9、Pinia 4.1.0、Vue Router 5.5.3。
 - Vite 8.4.0、@vitejs/plugin-vue 6.0.11、Vitest 5.1.2、jsdom 31.0.1。
 - 适配 Vite 8/Rolldown 的 manualChunks 配置，Node 要求 >=22.22.2。
+- Element Plus 按需组件导入并移除全量图标注册，vendor JS 体积约减半。
 
 ### Fixed
 
