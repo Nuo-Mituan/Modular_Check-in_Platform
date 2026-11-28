@@ -25,7 +25,7 @@ ENV PUID=${APP_UID} \
 
 LABEL org.opencontainers.image.title="Modular Check-in Platform" \
       org.opencontainers.image.description="Self-hosted daily check-in platform with hot-pluggable modules" \
-      org.opencontainers.image.version="1.1.1"
+      org.opencontainers.image.version="1.1.2"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

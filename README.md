@@ -1,10 +1,10 @@
 # 签到云台 · Modular Check-in Platform
 
-> ## v1.1.1
+> ## v1.1.2
 >
-> v1.1.1 包含执行超时、统一推送、安全与异步修复。
+> v1.1.2 完成 Python 3.13 运行时与依赖迁移。
 >
-> - 变更说明：[docs/RELEASE_NOTES_v1.1.1.md](docs/RELEASE_NOTES_v1.1.1.md)
+> - 变更说明：[docs/RELEASE_NOTES_v1.1.2.md](docs/RELEASE_NOTES_v1.1.2.md)
 > - 发布与变更管制：[docs/RELEASE_POLICY.md](docs/RELEASE_POLICY.md)
 > - Docker 验证 SOP：[docs/DOCKER_GATE_SOP.md](docs/DOCKER_GATE_SOP.md)
 > - 统一推送：[docs/UNIFIED_PUSH.md](docs/UNIFIED_PUSH.md)

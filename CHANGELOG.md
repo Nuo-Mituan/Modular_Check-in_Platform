@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.2] - 2026-11-28
+
+### Changed
+
+- Python 运行时、Docker 构建、CI、ruff/mypy 目标迁移到 Python 3.13。
+- 开发依赖升级为 pytest 9.2.0 + pytest-asyncio 1.5.0，修复安装冲突。
+- Pillow/redis/hypothesis 下限提升到具备 cp313 wheel 的版本。
+
+### Fixed
+
+- 修复 ruff F/E9 与 Python 3.13 目标下的 mypy 类型问题。
+- 修复 import-linter CI 无效安装步骤。
+
+
 ## [1.1.1] - 2026-11-26
 
 ### Fixed

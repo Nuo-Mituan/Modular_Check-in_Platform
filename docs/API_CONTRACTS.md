@@ -1,6 +1,6 @@
 # API 契约清单
 
-版本：`1.1.1`
+版本：`1.1.2`
 
 > 由 `scripts/openapi_base.json` 生成；请求/响应字段以 OpenAPI schema 为准。
 

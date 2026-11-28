@@ -45,7 +45,7 @@
         <div class="sidebar-foot">
           <span>Self-hosted</span>
           <span class="version">
-            v{{ appStore.meta?.version || APP_VERSION }}
+            {{ appStore.meta?.version || APP_VERSION }}
             <span v-if="updateAvailable" class="update-dot"></span>
           </span>
         </div>

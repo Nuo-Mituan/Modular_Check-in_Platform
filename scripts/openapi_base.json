@@ -2825,7 +2825,7 @@
   "info": {
     "description": "每日自动签到平台：模块热插拔、多账号串行、随机时间调度与实时日志。",
     "title": "签到云台 API",
-    "version": "1.1.1"
+    "version": "1.1.2"
   },
   "openapi": "3.1.0",
   "paths": {
